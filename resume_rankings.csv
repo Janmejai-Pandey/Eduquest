@@ -1,0 +1,41 @@
+rank,candidate_name,final_score,ranking_tier,skill_match_percentage,tfidf_similarity,found_skills,missing_skills,resume_length,percentile
+1,51588273 - Copy,6.2%,Poor Match ⭐,0.0%,20.8%,,skills; weights,452,100.0%
+2,51588273,6.2%,Poor Match ⭐,0.0%,20.8%,,skills; weights,452,97.5%
+3,61579998,4.9%,Poor Match ⭐,0.0%,16.4%,,skills; weights,859,95.0%
+4,64468610,2.3%,Poor Match ⭐,0.0%,7.7%,,skills; weights,1028,92.5%
+5,55953734,2.3%,Poor Match ⭐,0.0%,7.7%,,skills; weights,831,90.0%
+6,82246962 - Copy,2.1%,Poor Match ⭐,0.0%,7.2%,,skills; weights,1250,87.5%
+7,82246962,2.1%,Poor Match ⭐,0.0%,7.2%,,skills; weights,1250,85.0%
+8,86209934 - Copy,1.9%,Poor Match ⭐,0.0%,6.3%,,skills; weights,1100,82.5%
+9,86209934,1.9%,Poor Match ⭐,0.0%,6.3%,,skills; weights,1100,80.0%
+10,90280583 - Copy,1.7%,Poor Match ⭐,0.0%,5.7%,,skills; weights,988,77.5%
+11,90280583,1.7%,Poor Match ⭐,0.0%,5.7%,,skills; weights,988,75.0%
+12,86828820 - Copy,1.3%,Poor Match ⭐,0.0%,4.2%,,skills; weights,789,72.5%
+13,86828820,1.3%,Poor Match ⭐,0.0%,4.2%,,skills; weights,789,70.0%
+14,47919212 - Copy,1.1%,Poor Match ⭐,0.0%,3.6%,,skills; weights,893,67.5%
+15,47919212,1.1%,Poor Match ⭐,0.0%,3.6%,,skills; weights,893,65.0%
+16,56691064,1.1%,Poor Match ⭐,0.0%,3.5%,,skills; weights,1002,62.5%
+17,49127329 - Copy,1.0%,Poor Match ⭐,0.0%,3.3%,,skills; weights,1403,60.0%
+18,49127329,1.0%,Poor Match ⭐,0.0%,3.3%,,skills; weights,1403,57.5%
+19,81125166,0.9%,Poor Match ⭐,0.0%,3.0%,,skills; weights,1465,55.0%
+20,50328713 - Copy,0.7%,Poor Match ⭐,0.0%,2.2%,,skills; weights,1450,52.5%
+21,50328713,0.7%,Poor Match ⭐,0.0%,2.2%,,skills; weights,1450,50.0%
+22,47276718 - Copy,0.7%,Poor Match ⭐,0.0%,2.2%,,skills; weights,1274,47.5%
+23,47276718,0.7%,Poor Match ⭐,0.0%,2.2%,,skills; weights,1274,45.0%
+24,47549345 - Copy,0.6%,Poor Match ⭐,0.0%,2.1%,,skills; weights,660,42.5%
+25,47549345,0.6%,Poor Match ⭐,0.0%,2.1%,,skills; weights,660,40.0%
+26,77828437,0.6%,Poor Match ⭐,0.0%,2.1%,,skills; weights,1007,37.5%
+27,82125182 - Copy,0.4%,Poor Match ⭐,0.0%,1.2%,,skills; weights,698,35.0%
+28,82125182,0.4%,Poor Match ⭐,0.0%,1.2%,,skills; weights,698,32.5%
+29,96029688 - Copy (2),0.3%,Poor Match ⭐,0.0%,1.1%,,skills; weights,1239,30.0%
+30,96029688 - Copy - Copy,0.3%,Poor Match ⭐,0.0%,1.1%,,skills; weights,1239,27.5%
+31,96029688 - Copy,0.3%,Poor Match ⭐,0.0%,1.1%,,skills; weights,1239,25.0%
+32,96029688,0.3%,Poor Match ⭐,0.0%,1.1%,,skills; weights,1239,22.5%
+33,54227873,0.3%,Poor Match ⭐,0.0%,0.9%,,skills; weights,1114,20.0%
+34,44624796 - Copy,0.2%,Poor Match ⭐,0.0%,0.7%,,skills; weights,539,17.5%
+35,44624796,0.2%,Poor Match ⭐,0.0%,0.7%,,skills; weights,539,15.0%
+36,64755882,0.2%,Poor Match ⭐,0.0%,0.6%,,skills; weights,734,12.5%
+37,62071407,0.1%,Poor Match ⭐,0.0%,0.5%,,skills; weights,838,10.0%
+38,74236636,0.1%,Poor Match ⭐,0.0%,0.4%,,skills; weights,941,7.5%
+39,55595908,0.0%,Poor Match ⭐,0.0%,0.0%,,skills; weights,1069,5.0%
+40,60004873,0.0%,Poor Match ⭐,0.0%,0.0%,,skills; weights,466,2.5%

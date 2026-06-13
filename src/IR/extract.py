@@ -124,7 +124,7 @@ def chunk_records(records, max_words=200, overlap=40):
 
 # =================Index_Building===================
 
-INDEX_DIR = "index_store"
+INDEX_DIR = "resume_index_store"
 EMBED_MODEL = "all-MiniLM-L6-v2"   # small, fast, good quality
 
 
@@ -173,7 +173,7 @@ def build_indexes(chunks):
 # =================Main function to run the whole pipeline===================
 
 if __name__ == "__main__":
-    folder = "dataset/study_material"  # Change this to your folder path
+    folder = "dataset/resume_dataset/ENGINEERING"  # Change this to your folder path
     print(f"Extracting documents from folder: {folder}")
     records = extract_folder(folder)
 
