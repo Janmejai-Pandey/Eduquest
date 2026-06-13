@@ -168,3 +168,19 @@ def build_indexes(chunks):
         json.dump(chunks, f, ensure_ascii=False)
 
     print("Indexes saved to", INDEX_DIR)
+    
+    
+# =================Main function to run the whole pipeline===================
+
+if __name__ == "__main__":
+    folder = "dataset/study_material"  # Change this to your folder path
+    print(f"Extracting documents from folder: {folder}")
+    records = extract_folder(folder)
+
+    print("Chunking extracted text...")
+    chunks = chunk_records(records)
+
+    print("Building indexes...")
+    build_indexes(chunks)
+
+    print("All done! You can now query the indexes for retrieval.")
