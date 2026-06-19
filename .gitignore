@@ -1,1 +1,3 @@
-dataset
+dataset/**
+!dataset/**/
+!dataset/**/gdrive_links.json
