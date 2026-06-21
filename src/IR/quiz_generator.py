@@ -8,7 +8,6 @@ import os
 import io
 import json
 import re
-import random
 from typing import List, Dict, Optional, Tuple
 
 import requests
@@ -37,31 +36,9 @@ def build_quiz_prompt(
     question_types: List[str],
     difficulty: str,
     num_questions: int,
-    answer_key_mode: str,
 ) -> str:
-    """
-    Build a structured system prompt for quiz generation.
-    answer_key_mode: 'inline' | 'end' | 'separate'
-    """
+    """Build a structured system prompt for quiz generation (inline answers)."""
     types_str = ", ".join(question_types)
-
-    answer_instruction = {
-        "inline": (
-            "Show the correct answer + brief explanation IMMEDIATELY "
-            "after each question."
-        ),
-        "end": (
-            "DO NOT show answers next to questions. "
-            "Place ALL answers + explanations in a clearly separated "
-            "'## ANSWER KEY' section at the very end."
-        ),
-        "separate": (
-            "Generate the quiz questions ONLY (no answers). "
-            "Then, after a clear delimiter line '===ANSWERS===', "
-            "list all answers with explanations. "
-            "We will split the file into two later."
-        ),
-    }.get(answer_key_mode, "")
 
     return f"""You are an expert quiz-master and academic question setter.
 
@@ -83,7 +60,8 @@ REQUIREMENTS:
   style with structured sub-points).
 
 ANSWER POLICY:
-{answer_instruction}
+Show the correct answer + brief explanation IMMEDIATELY after each
+question.
 
 FORMAT (strict):
 Use this exact structure for every question:
@@ -97,7 +75,6 @@ Use this exact structure for every question:
 (C) option 3
 (D) option 4
 
-(For inline answers only:)
 **Answer:** <answer>
 **Explanation:** <brief explanation>
 
@@ -113,15 +90,12 @@ provided content. Do not invent facts not present in the material.
 # ============== LOAD & FILTER ==============
 
 def load_gdrive_links(semester: str) -> List[Dict]:
-    """Load gdrive_links.json for the given semester."""
     sem_folder = SEM_FOLDERS.get(semester)
     if not sem_folder or not os.path.isdir(sem_folder):
         raise FileNotFoundError(f"Semester folder not found: {sem_folder}")
-
     json_path = os.path.join(sem_folder, "gdrive_links.json")
     if not os.path.isfile(json_path):
         raise FileNotFoundError(f"gdrive_links.json not found at: {json_path}")
-
     with open(json_path, "r", encoding="utf-8") as f:
         return json.load(f)
 
@@ -133,7 +107,6 @@ def get_subjects(links: List[Dict]) -> List[str]:
 def get_files_by_category(
     links: List[Dict], subject: str, category: str
 ) -> List[Dict]:
-    """Return files for subject + category, naturally sorted."""
     filtered = [
         link for link in links
         if link["subject"] == subject
@@ -154,21 +127,15 @@ def get_files_by_category(
 def get_available_categories(
     links: List[Dict], subject: str
 ) -> List[str]:
-    """Return categories that have at least one file for this subject."""
     cats = set()
     for link in links:
         if link["subject"] == subject and not link.get("is_folder", False):
             cats.add(link["category"])
-    # Keep our preferred order
     ordered = ["Lectures", "Tutorials", "PYQs", "Course Description"]
     return [c for c in ordered if c in cats]
 
 
 def get_pyq_years(pyq_files: List[Dict]) -> List[str]:
-    """
-    Extract distinct year-ish tags from PYQ filenames.
-    e.g. 'T1 2026.pdf' -> '2026'; 'DBMS_T1' -> 'Untagged'.
-    """
     years = set()
     for f in pyq_files:
         name = f.get("item_name", "")
@@ -183,7 +150,6 @@ def get_pyq_years(pyq_files: List[Dict]) -> List[str]:
 def get_pyq_files_by_year(
     pyq_files: List[Dict], year: str
 ) -> List[Dict]:
-    """Return PYQ files tagged with the given year (or Untagged)."""
     result = []
     for f in pyq_files:
         name = f.get("item_name", "")
@@ -197,7 +163,6 @@ def get_pyq_files_by_year(
 # ============== STREAM FROM GDRIVE ==============
 
 def stream_from_gdrive(file_id: str) -> Optional[io.BytesIO]:
-    """Stream a Google Drive file into an in-memory buffer."""
     session = requests.Session()
     session.headers.update({
         "User-Agent": (
@@ -283,7 +248,6 @@ def extract_pptx_from_buffer(buffer: io.BytesIO, source_name: str) -> List[Dict]
 
 
 def extract_text_from_gdrive(file_info: Dict) -> Tuple[str, str]:
-    """Returns (text, view_url)."""
     file_id = file_info.get("file_id", "")
     item_name = file_info.get("item_name", "Unknown")
     view_url = file_info.get(
@@ -305,7 +269,6 @@ def extract_text_from_gdrive(file_info: Dict) -> Tuple[str, str]:
     elif lower_name.endswith(".pptx"):
         records = extract_pptx_from_buffer(buffer, item_name)
     else:
-        # Try both
         records = extract_pdf_from_buffer(buffer, item_name)
         if not records:
             buffer.seek(0)
@@ -317,10 +280,6 @@ def extract_text_from_gdrive(file_info: Dict) -> Tuple[str, str]:
 
 
 def gather_content(files: List[Dict]) -> Tuple[str, List[Dict]]:
-    """
-    Gather text from a list of files.
-    Returns (combined_text, list_of_processed_links).
-    """
     all_texts = []
     processed_links = []
     for f in files:
@@ -341,7 +300,7 @@ def gather_content(files: List[Dict]) -> Tuple[str, List[Dict]]:
 # ============== AUTO-DECIDE NUM QUESTIONS ==============
 
 def auto_num_questions(text: str) -> int:
-    """Estimate a reasonable number of questions based on content length."""
+    """Decide question count based on content length."""
     words = len(text.split())
     if words < 500:
         return 5
@@ -364,9 +323,8 @@ def generate_quiz(
     question_types: List[str],
     difficulty: str,
     num_questions: int,
-    answer_key_mode: str,
 ) -> str:
-    """Call LLM and return the quiz text."""
+    """Call LLM and return the quiz text (inline answer format)."""
     MAX_WORDS = 14000
     word_count = len(content.split())
     if word_count > MAX_WORDS:
@@ -375,7 +333,7 @@ def generate_quiz(
         print(f"   Truncated content to {MAX_WORDS} words for LLM context")
 
     system_prompt = build_quiz_prompt(
-        question_types, difficulty, num_questions, answer_key_mode
+        question_types, difficulty, num_questions
     )
     user_msg = (
         f"Subject: {subject}\n"
@@ -393,61 +351,9 @@ def generate_quiz(
 # ============== PARSE QUIZ FOR INTERACTIVE MODE ==============
 
 def parse_quiz(quiz_text: str) -> List[Dict]:
-    """
-    Parse quiz text into a list of question dicts:
-    {
-        "number": "Q1",
-        "header": "Q1. [MCQ] [Medium]",
-        "question_block": "<full question text including options>",
-        "answer": "<answer text>",
-        "explanation": "<explanation text>"
-    }
-
-    Works for both inline-answer and end-of-file answer formats.
-    """
+    """Parse quiz text into a list of question dicts."""
     questions = []
-
-    # Split blocks by '### Q' marker (handles minor formatting variation)
     chunks = re.split(r"(?=^#{1,3}\s*Q\d+\.)", quiz_text, flags=re.MULTILINE)
-
-    # Detect a global answer key section (for 'end' mode)
-    answer_key_text = ""
-    key_match = re.split(
-        r"(?:^|\n)#{1,3}\s*ANSWER\s*KEY\s*\n|={3,}\s*ANSWERS\s*={3,}",
-        quiz_text,
-        flags=re.IGNORECASE,
-    )
-    if len(key_match) > 1:
-        answer_key_text = key_match[-1]
-
-    # Parse global answer key into {q_number: (answer, explanation)}
-    global_answers: Dict[str, Tuple[str, str]] = {}
-    if answer_key_text:
-        # Look for patterns like "Q1. <answer>" or "Q1: <answer>"
-        for m in re.finditer(
-            r"Q(\d+)[\.\:\)]?\s*(.+?)(?=(?:\nQ\d+[\.\:\)]|\Z))",
-            answer_key_text,
-            flags=re.DOTALL | re.IGNORECASE,
-        ):
-            qnum = "Q" + m.group(1)
-            block = m.group(2).strip()
-            # Try to split into answer + explanation
-            exp_match = re.search(
-                r"(?:explanation|reason)\s*[:\-]\s*(.+)",
-                block, flags=re.IGNORECASE | re.DOTALL,
-            )
-            if exp_match:
-                explanation = exp_match.group(1).strip()
-                answer = block[:exp_match.start()].strip()
-                answer = re.sub(
-                    r"^(?:answer\s*[:\-]\s*)", "", answer, flags=re.IGNORECASE
-                ).strip()
-            else:
-                answer = re.sub(
-                    r"^(?:answer\s*[:\-]\s*)", "", block, flags=re.IGNORECASE
-                ).strip()
-                explanation = ""
-            global_answers[qnum] = (answer, explanation)
 
     for chunk in chunks:
         chunk = chunk.strip()
@@ -459,7 +365,6 @@ def parse_quiz(quiz_text: str) -> List[Dict]:
         qnum = header_match.group(1)
         header = chunk.split("\n", 1)[0].lstrip("#").strip()
 
-        # Try inline answer extraction
         ans_match = re.search(
             r"\*\*Answer:\*\*\s*(.+?)(?=\n\*\*Explanation|\n---|\Z)",
             chunk, flags=re.DOTALL | re.IGNORECASE,
@@ -468,15 +373,9 @@ def parse_quiz(quiz_text: str) -> List[Dict]:
             r"\*\*Explanation:\*\*\s*(.+?)(?=\n---|\Z)",
             chunk, flags=re.DOTALL | re.IGNORECASE,
         )
-
         answer = ans_match.group(1).strip() if ans_match else ""
         explanation = exp_match.group(1).strip() if exp_match else ""
 
-        # If no inline answer, try global key
-        if not answer and qnum in global_answers:
-            answer, explanation = global_answers[qnum]
-
-        # Question block = chunk minus header & answer/explanation sections
         question_block = chunk
         question_block = re.sub(r"^#{1,3}\s*Q\d+\..*\n", "", question_block)
         question_block = re.sub(
@@ -508,12 +407,8 @@ def save_quiz(
     subject: str,
     label: str,
     links: Optional[List[Dict]] = None,
-    answer_key_mode: str = "inline",
-) -> Tuple[str, Optional[str]]:
-    """
-    Save quiz markdown. If answer_key_mode == 'separate', save answers
-    in a second file. Returns (quiz_path, answers_path_or_None).
-    """
+) -> str:
+    """Save quiz markdown (inline answers always). Returns file path."""
     safe_subject = re.sub(r'[<>:"/\\|?*]', "_", subject).strip()
     out_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
@@ -526,43 +421,19 @@ def save_quiz(
     clean_label = re.sub(r'[<>:"/\\|?*]', "_", label).strip()
     if len(clean_label) > 100:
         clean_label = clean_label[:100]
+    filename = f"quiz_{clean_label}.md"
+    filepath = os.path.join(out_dir, filename)
 
-    quiz_filename = f"quiz_{clean_label}.md"
-    quiz_path = os.path.join(out_dir, quiz_filename)
-    answers_path = None
+    with open(filepath, "w", encoding="utf-8") as f:
+        f.write(f"# Quiz: {label}\n")
+        f.write(f"**Subject**: {subject}\n")
+        f.write(f"**Semester**: {semester}\n\n")
+        if links:
+            f.write("## Source Files (click to open)\n\n")
+            for link in links:
+                f.write(f"- [{link['name']}]({link['url']})\n")
+            f.write("\n")
+        f.write("---\n\n")
+        f.write(quiz_text)
 
-    # Handle 'separate' mode → split file at ===ANSWERS===
-    if answer_key_mode == "separate" and "===ANSWERS===" in quiz_text:
-        parts = quiz_text.split("===ANSWERS===", 1)
-        quiz_body = parts[0].strip()
-        answers_body = parts[1].strip()
-
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            _write_quiz_header(f, label, subject, semester, links)
-            f.write(quiz_body)
-
-        answers_filename = f"answers_{clean_label}.md"
-        answers_path = os.path.join(out_dir, answers_filename)
-        with open(answers_path, "w", encoding="utf-8") as f:
-            f.write(f"# Answer Key: {label}\n")
-            f.write(f"**Subject**: {subject}\n")
-            f.write(f"**Semester**: {semester}\n\n---\n\n")
-            f.write(answers_body)
-    else:
-        with open(quiz_path, "w", encoding="utf-8") as f:
-            _write_quiz_header(f, label, subject, semester, links)
-            f.write(quiz_text)
-
-    return quiz_path, answers_path
-
-
-def _write_quiz_header(f, label, subject, semester, links):
-    f.write(f"# Quiz: {label}\n")
-    f.write(f"**Subject**: {subject}\n")
-    f.write(f"**Semester**: {semester}\n\n")
-    if links:
-        f.write("## Source Files (click to open)\n\n")
-        for link in links:
-            f.write(f"- [{link['name']}]({link['url']})\n")
-        f.write("\n")
-    f.write("---\n\n")
+    return filepath

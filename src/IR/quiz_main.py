@@ -6,6 +6,7 @@ Run from src/IR/:  python quiz_main.py
 
 import os
 import sys
+import re
 import textwrap
 from colorama import Fore, Style, init
 
@@ -41,8 +42,8 @@ def print_banner():
     print(Fore.CYAN + "=" * 60)
     print(Fore.CYAN + "   QUIZ GENERATOR  |  Groq LLM")
     print(Fore.CYAN + "=" * 60)
-    print(Fore.YELLOW + "   Generate practice quizzes from lectures,")
-    print(Fore.YELLOW + "   tutorials & previous year question papers")
+    print(Fore.YELLOW + "   Interactive quiz from lectures, tutorials & PYQs")
+    print(Fore.YELLOW + "   Auto-sized | Inline answers | Live scoring")
     print(Fore.CYAN + "=" * 60 + "\n")
 
 
@@ -80,7 +81,6 @@ def ask_subject(subjects: list) -> str:
 
 
 def ask_category(categories: list) -> str:
-    """Ask user to pick a category."""
     print(Fore.YELLOW + "\nAvailable categories:\n")
     for i, cat in enumerate(categories, start=1):
         print(Fore.WHITE + f"  [{i}] {cat}")
@@ -107,7 +107,6 @@ def display_files(files: list, label: str = "files"):
 
 
 def ask_lecture_or_tut_mode(category: str) -> str:
-    """Ask: single / range / all."""
     print(Fore.YELLOW + f"\n{category} selection mode:")
     print(Fore.WHITE + f"  [1] Single {category[:-1].lower()}")
     print(Fore.WHITE + f"  [2] Range of {category.lower()}")
@@ -208,7 +207,6 @@ def ask_pyq_year(years: list) -> str:
 
 
 def ask_question_types() -> list:
-    """Multi-select question types."""
     types = [
         ("MCQ", "Multiple Choice Questions (4 options)"),
         ("Short Answer", "1-2 line answer questions"),
@@ -253,61 +251,6 @@ def ask_difficulty() -> str:
                 return options[idx]
         except ValueError:
             pass
-        print(Fore.RED + "Invalid.")
-
-
-def ask_num_questions(content_word_count: int) -> int:
-    suggested = auto_num_questions(" " * content_word_count)
-    print(
-        Fore.YELLOW
-        + f"\nNumber of questions (suggested based on content: {suggested}):"
-    )
-    print(Fore.WHITE + "  Press Enter to use suggested, or type a number")
-    while True:
-        choice = input(
-            Fore.GREEN + "Your choice: " + Style.RESET_ALL
-        ).strip()
-        if not choice:
-            return suggested
-        try:
-            n = int(choice)
-            if 1 <= n <= 50:
-                return n
-        except ValueError:
-            pass
-        print(Fore.RED + "Enter 1-50, or press Enter for suggested.")
-
-
-def ask_quiz_mode() -> str:
-    print(Fore.YELLOW + "\nQuiz mode:")
-    print(Fore.WHITE + "  [1] Interactive Quiz (CLI test - answer questions live)")
-    print(Fore.WHITE + "  [2] Generate & Save Only (worksheet style)")
-    while True:
-        choice = input(
-            Fore.GREEN + "\nSelect (1 or 2): " + Style.RESET_ALL
-        ).strip()
-        if choice == "1":
-            return "interactive"
-        if choice == "2":
-            return "save"
-        print(Fore.RED + "Invalid.")
-
-
-def ask_answer_key_mode() -> str:
-    print(Fore.YELLOW + "\nAnswer key placement:")
-    print(Fore.WHITE + "  [1] Inline (after each question)")
-    print(Fore.WHITE + "  [2] At the end of file")
-    print(Fore.WHITE + "  [3] Separate file altogether")
-    while True:
-        choice = input(
-            Fore.GREEN + "\nSelect (1/2/3): " + Style.RESET_ALL
-        ).strip()
-        if choice == "1":
-            return "inline"
-        if choice == "2":
-            return "end"
-        if choice == "3":
-            return "separate"
         print(Fore.RED + "Invalid.")
 
 
@@ -367,11 +310,9 @@ def run_interactive_quiz(questions: list):
 
         attempted += 1
 
-        # Compare answers loosely
         if q["answer"]:
             correct = q["answer"].lower().strip()
             user = user_ans.lower().strip()
-            # MCQ-style: accept "a", "(a)", "A", "option a", etc.
             mcq_letter = re.match(r"^\(?([a-d])\)?$", user)
             correct_letter = re.search(r"\b([A-D])\b", q["answer"])
             is_correct = False
@@ -381,7 +322,6 @@ def run_interactive_quiz(questions: list):
                     mcq_letter.group(1).upper() == correct_letter.group(1).upper()
                 )
             else:
-                # Loose substring match
                 is_correct = (
                     user in correct or correct in user
                     or any(w in correct for w in user.split() if len(w) > 3)
@@ -396,7 +336,7 @@ def run_interactive_quiz(questions: list):
             if q["explanation"]:
                 print(Fore.WHITE + f"Explanation: {q['explanation']}")
         else:
-            print(Fore.YELLOW + "(No answer key available for this question)")
+            print(Fore.YELLOW + "(No answer key available)")
 
     # Final score
     print(Fore.CYAN + "\n" + "=" * 60)
@@ -411,8 +351,6 @@ def run_interactive_quiz(questions: list):
 
 
 # ============== MAIN FLOW ==============
-
-import re  # used in interactive
 
 def main():
     print_banner()
@@ -435,7 +373,6 @@ def main():
 
     # Step 4: Category
     categories = get_available_categories(links, subject)
-    # Filter out Course Description for quiz purposes
     categories = [c for c in categories if c != "Course Description"]
     if not categories:
         print(Fore.RED + "No suitable categories available for this subject.")
@@ -443,7 +380,7 @@ def main():
     category = ask_category(categories)
     print(Fore.CYAN + f"\nCategory: {category}\n")
 
-    # Step 5: File selection (different flow for PYQs)
+    # Step 5: File selection
     selected_files = []
     label = ""
 
@@ -468,7 +405,6 @@ def main():
             for f in selected_files:
                 print(f"    - {f['item_name']}")
     else:
-        # Lectures or Tutorials
         files = get_files_by_category(links, subject, category)
         if not files:
             print(Fore.RED + f"No {category} found for this subject.")
@@ -507,17 +443,11 @@ def main():
     word_count = len(content.split())
     print(Fore.CYAN + f"\nTotal content: {word_count} words")
 
-    # Step 9: Number of questions
-    num_q = ask_num_questions(word_count)
-    print(Fore.CYAN + f"\nWill generate {num_q} questions\n")
+    # Step 9: Auto-decide number of questions
+    num_q = auto_num_questions(content)
+    print(Fore.CYAN + f"Generating {num_q} questions (auto-sized to content)\n")
 
-    # Step 10: Quiz mode
-    quiz_mode = ask_quiz_mode()
-
-    # Step 11: Answer key placement
-    answer_key_mode = ask_answer_key_mode()
-
-    # Step 12: Generate
+    # Step 10: Generate quiz (always inline answers)
     quiz_text = generate_quiz(
         content=content,
         subject=subject,
@@ -525,44 +455,25 @@ def main():
         question_types=qtypes,
         difficulty=difficulty,
         num_questions=num_q,
-        answer_key_mode=answer_key_mode,
     )
 
-    # Step 13: Save
-    quiz_path, answers_path = save_quiz(
+    # Step 11: Save (background, always)
+    quiz_path = save_quiz(
         quiz_text=quiz_text,
         semester=semester,
         subject=subject,
         label=label,
         links=processed_links,
-        answer_key_mode=answer_key_mode,
     )
 
-    # Step 14: Display + interactive
-    if quiz_mode == "save":
-        print(Fore.CYAN + "\n" + "=" * 60)
-        print(Fore.CYAN + "   QUIZ (preview)")
-        print(Fore.CYAN + "=" * 60 + "\n")
-        # Show only first 1500 chars in CLI to avoid flooding
-        preview = quiz_text[:1500]
-        print(Style.RESET_ALL + wrap(preview))
-        if len(quiz_text) > 1500:
-            print(Fore.YELLOW + "\n... (truncated - see saved file for full quiz)")
-        print_links(processed_links)
-        print(Fore.GREEN + f"Quiz saved to: {quiz_path}")
-        if answers_path:
-            print(Fore.GREEN + f"Answers saved to: {answers_path}")
-        print()
-    else:
-        # Interactive mode
-        questions = parse_quiz(quiz_text)
-        print(Fore.CYAN + f"\nParsed {len(questions)} questions for interactive mode\n")
-        run_interactive_quiz(questions)
-        print_links(processed_links)
-        print(Fore.GREEN + f"Full quiz also saved to: {quiz_path}")
-        if answers_path:
-            print(Fore.GREEN + f"Answers saved to: {answers_path}")
-        print()
+    # Step 12: Run interactive quiz (always)
+    questions = parse_quiz(quiz_text)
+    print(Fore.CYAN + f"\nParsed {len(questions)} questions\n")
+    run_interactive_quiz(questions)
+
+    # Step 13: Show links + save path
+    print_links(processed_links)
+    print(Fore.GREEN + f"Full quiz also saved to: {quiz_path}\n")
 
     # Continue?
     again = input(
