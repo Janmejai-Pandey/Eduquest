@@ -7,23 +7,23 @@ import json
 # ─────────────────────────────────────────────
 # Get project root (JaPari/)
 CURRENT_DIR  = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+IR_DIR      = os.path.join(PROJECT_ROOT, "src", "IR")
+RESUME_PROJECT_DIR = os.path.join(PROJECT_ROOT, "src", "resume_project")
+
+sys.path.append(IR_DIR)
+sys.path.append(RESUME_PROJECT_DIR)
 
 # Change to project root so 'index_store/...' works
 os.chdir(PROJECT_ROOT)
-
-# Add IR folder to path so we can import chatbot
-sys.path.insert(0, CURRENT_DIR)
-
 # ─────────────────────────────────────────────
 # Now import everything
 # ─────────────────────────────────────────────
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-
-from chatbot import RAGChatbot
+from typing import Any
+from src.IR.chatbot import RAGChatbot
 
 
 # ─────────────────────────────────────────────
@@ -106,18 +106,18 @@ FILE_LINKS = load_file_links()
 # ─────────────────────────────────────────────
 class ChatRequest(BaseModel):
     message: str
-    session_id: Optional[str] = "default"
+    session_id: str | None = "default"
 
 
 class ChatResponse(BaseModel):
     answer: str
-    sources: List[Dict[str, Any]]
+    sources: list[dict[str, Any]]
 
 
 # ─────────────────────────────────────────────
 # Session management
 # ─────────────────────────────────────────────
-sessions: Dict[str, RAGChatbot] = {}
+sessions: dict[str, RAGChatbot] = {}
 
 
 def get_bot(session_id: str) -> RAGChatbot:
@@ -197,4 +197,74 @@ def get_stats():
             "files":        files_with_links,
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# ════════════════════════════════════════════════════════
+# RESUME RANKING ENDPOINTS
+# ════════════════════════════════════════════════════════
+
+from fastapi import UploadFile, File, Form
+from src.resume_project.resume_api import (
+    analyze_resume,
+    get_available_roles,
+    get_csv_stats,
+)
+
+
+@app.get("/resume/roles")
+def list_roles():
+    """Get available job roles with their skills."""
+    return {"roles": get_available_roles()}
+
+
+@app.get("/resume/stats")
+def resume_stats():
+    """Get stats about existing rankings."""
+    return get_csv_stats()
+
+
+@app.post("/resume/analyze")
+async def analyze_resume_endpoint(
+    file:     UploadFile = File(...),
+    name:     str        = Form(...),
+    job_role: str        = Form(...),
+    branch:   str        = Form(""),
+    year:     int        = Form(0),
+):
+    """Analyze uploaded resume."""
+    try:
+        # Validation
+        if not name.strip():
+            raise HTTPException(status_code=400, detail="Name is required")
+
+        file_bytes = await file.read()
+        if len(file_bytes) == 0:
+            raise HTTPException(status_code=400, detail="Empty file")
+        if len(file_bytes) > 10 * 1024 * 1024:
+            raise HTTPException(status_code=400, detail="File too large (max 10MB)")
+
+        # Check extension
+        ext = file.filename.lower().split('.')[-1]
+        if ext not in ['pdf', 'pptx']:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unsupported file type '.{ext}'. Use PDF or PPTX."
+            )
+
+        # Analyze
+        result = analyze_resume(
+            filename   = file.filename,
+            file_bytes = file_bytes,
+            user_name  = name.strip(),
+            job_role   = job_role.strip(),
+            branch     = branch.strip(),
+            year       = year,
+        )
+        return result
+
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
