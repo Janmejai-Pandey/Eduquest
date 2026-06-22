@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JaPari Chat — Ask Your Documents</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="utils.css">
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="chat.css">
+</head>
+<body>
+
+    <!-- ═══════════════ NAVBAR ═══════════════ -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <div class="nav-logo-icon">📚</div>
+                <span class="nav-logo-text">JaPari</span>
+            </a>
+
+            <ul class="nav-links" id="navLinks">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="chat.html" class="active">Chat</a></li>
+                <li><a href="index.html#how-it-works">How it Works</a></li>
+                <li><a href="#" id="clearChatBtn" class="nav-cta">🗑️ Clear Chat</a></li>
+            </ul>
+
+            <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ═══════════════ CHAT LAYOUT ═══════════════ -->
+    <div class="chat-layout">
+
+        <!-- Sidebar -->
+        <aside class="chat-sidebar">
+            <div class="sidebar-section">
+                <h3>📊 Stats</h3>
+                <div class="stat-row">
+                    <span>Files indexed:</span>
+                    <strong id="statFiles">—</strong>
+                </div>
+                <div class="stat-row">
+                    <span>Chunks:</span>
+                    <strong id="statChunks">—</strong>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>📁 Indexed Files</h3>
+                <div class="file-list" id="fileList">
+                    <div class="loading">Loading…</div>
+                </div>
+            </div>
+
+            <div class="sidebar-section">
+                <h3>💡 Tips</h3>
+                <ul class="tips-list">
+                    <li>Ask specific questions for best results</li>
+                    <li>Click sources to see evidence</li>
+                    <li>Click file names to open original</li>
+                </ul>
+            </div>
+        </aside>
+
+        <!-- Main chat -->
+        <main class="chat-main">
+            <div class="chat-page-header">
+                <div>
+                    <h1>📚 Ask Your Documents</h1>
+                    <p>Get instant answers from your study materials</p>
+                </div>
+                <div class="status-pill" id="statusPill">
+                    <span class="status-dot"></span>
+                    Connecting…
+                </div>
+            </div>
+
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-screen">
+                    <div class="welcome-icon">✨</div>
+                    <h2>Welcome to JaPari Chat</h2>
+                    <p>Ask any question about your uploaded documents.</p>
+
+                    <div class="suggestions">
+                        <h4>Try asking:</h4>
+                        <button class="suggestion-chip">What is supervised learning?</button>
+                        <button class="suggestion-chip">Summarize the main topics</button>
+                        <button class="suggestion-chip">Explain key concepts</button>
+                        <button class="suggestion-chip">List all subjects covered</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chat-input-wrapper">
+                <form class="chat-form" id="chatForm">
+                    <textarea
+                        id="chatInput"
+                        placeholder="Ask anything about your documents…"
+                        rows="1"
+                    ></textarea>
+                    <button type="submit" class="chat-submit-btn" id="submitBtn">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                        </svg>
+                    </button>
+                </form>
+                <div class="chat-footer-note">
+                    Press <kbd>Enter</kbd> to send · <kbd>Shift + Enter</kbd> for new line
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="script.js"></script>
+    <script src="chat.js"></script>
+</body>
+</html>

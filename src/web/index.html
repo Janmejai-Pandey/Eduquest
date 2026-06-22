@@ -3,10 +3,291 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hieeeee</title>
+    <title>JaPari - AI Study Companion</title>
+
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+
+    <!-- Stylesheets -->
+    <link rel="stylesheet" href="utils.css">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <h1>hiiiiiiiiiiii pariiiiiiiiiiii</h1>
-    Lorem ipsum dolor sit amet consectetur adipisicing elit. Voluptate, quibusdam inventore! Quisquam facere provident ut vitae tenetur sed cupiditate, saepe quis eum delectus temporibus blanditiis obcaecati in voluptatibus dolorum sapiente.
+
+    <!-- ═══════════════ NAVBAR ═══════════════ -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="#" class="nav-logo">
+                <div class="nav-logo-icon">📚</div>
+                <span class="nav-logo-text">JaPari</span>
+            </a>
+
+            <ul class="nav-links" id="navLinks">
+                <li><a href="#" class="active">Home</a></li>
+                <li class="dropdown">
+                    <a href="#features" class="dropdown-toggle">Tools</a>
+                    <div class="dropdown-menu">
+                        <a href="chat.html">Document Chat</a>
+                        <a href="#features">Auto Flashcards</a>
+                        <a href="#features">Study Planner</a>
+                    </div>
+                </li>
+                <li><a href="#how-it-works">How it Works</a></li>
+                <li><a href="#stats">About</a></li>
+                <li><a href="chat.html" class="nav-cta">Start Studying</a></li>
+            </ul>
+
+            <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- ═══════════════ HERO ═══════════════ -->
+    <section class="hero">
+        <div class="container">
+            <div class="hero-inner">
+                <div class="hero-content">
+                    <div class="hero-badge">
+                        <span class="sparkle">✨</span>
+                        AI-powered study companion
+                    </div>
+
+                    <h1 class="hero-title">
+                        Study smarter,<br>
+                        <em>not harder.</em>
+                    </h1>
+
+                    <p class="hero-description">
+                        Upload your lecture slides, textbooks, and notes. Ask questions, 
+                        generate flashcards, and get instant explanations — all from your 
+                        own documents.
+                    </p>
+
+                    <div class="hero-buttons">
+                        <a href="chat.html" class="btn-primary">
+                            Upload & Chat <span class="arrow">→</span>
+                        </a>
+                        <a href="#features" class="btn-secondary">
+                            Browse Tools
+                        </a>
+                    </div>
+
+                    <div class="hero-checks">
+                        <div class="hero-check">
+                            <div class="check-icon">✓</div>
+                            PDF support
+                        </div>
+                        <div class="hero-check">
+                            <div class="check-icon">✓</div>
+                            PPTX support
+                        </div>
+                        <div class="hero-check">
+                            <div class="check-icon">✓</div>
+                            Instant answers
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat Mockup -->
+                <div class="hero-chat">
+                    <div class="chat-window">
+                        <div class="chat-header">
+                            <div class="chat-header-left">
+                                💬 Document Chat
+                            </div>
+                            <div class="chat-header-dots">
+                                <span></span><span></span><span></span>
+                            </div>
+                        </div>
+
+                        <div class="chat-body">
+                            <div class="chat-msg user">
+                                <div class="file-tag">lecture-week4.pdf</div>
+                                What are the main differences between supervised and unsupervised learning?
+                            </div>
+
+                            <div class="chat-msg bot">
+                                <div class="ai-label">✨ AI Answer</div>
+                                Based on your slide 12, supervised learning uses labeled training data to predict outcomes, while unsupervised learning finds hidden patterns without labels...
+                            </div>
+                        </div>
+
+                        <div class="chat-input-area">
+                            <input type="text" placeholder="Ask a follow-up question..." disabled>
+                            <button class="chat-send-btn">➤</button>
+                        </div>
+
+                        <div class="chat-source-badge">
+                            <span class="green-dot">✓</span>
+                            Answer from your document
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ FEATURES ═══════════════ -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-label fade-in">FEATURES</div>
+            <h2 class="section-title fade-in">Everything you need to excel</h2>
+
+            <div class="features-grid">
+                <div class="feature-card fade-in">
+                    <div class="feature-icon purple">💬</div>
+                    <h3>Document Chat</h3>
+                    <p>Upload PDFs and PPTX files. Ask questions and get precise answers drawn directly from your material.</p>
+                </div>
+
+                <div class="feature-card fade-in">
+                    <div class="feature-icon violet">🧠</div>
+                    <h3>Auto Flashcards</h3>
+                    <p>Generate intelligent flashcards from your notes and study them with spaced repetition.</p>
+                </div>
+
+                <div class="feature-card fade-in">
+                    <div class="feature-icon orange">⏱️</div>
+                    <h3>Study Planner</h3>
+                    <p>Organize your study sessions, track progress, and meet your deadlines with confidence.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ HOW IT WORKS ═══════════════ -->
+    <section class="how-it-works" id="how-it-works">
+        <div class="container">
+            <div class="how-inner">
+                <div>
+                    <div class="how-label">HOW IT WORKS</div>
+                    <h2 class="how-title">From upload to understanding in minutes.</h2>
+                </div>
+
+                <div class="steps">
+                    <div class="step">
+                        <div class="step-number">01</div>
+                        <div>
+                            <h3>Upload your documents</h3>
+                            <p>Drag and drop your lecture PDFs or PPTX slides.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">02</div>
+                        <div>
+                            <h3>Ask anything</h3>
+                            <p>Type your question in plain English. JaPari reads your files and responds with specific references.</p>
+                        </div>
+                    </div>
+
+                    <div class="step">
+                        <div class="step-number">03</div>
+                        <div>
+                            <h3>Learn deeper</h3>
+                            <p>Generate flashcards, create summaries, and build study plans from your material.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ STATS ═══════════════ -->
+    <section class="stats" id="stats">
+        <div class="container">
+            <div class="stats-grid">
+                <div class="stat-item fade-in">
+                    <div class="stat-number" data-target="10">0</div>
+                    <div class="stat-suffix">K+</div>
+                    <div class="stat-label">Students using JaPari</div>
+                </div>
+                <div class="stat-item fade-in">
+                    <div class="stat-number" data-target="250">0</div>
+                    <div class="stat-suffix">K+</div>
+                    <div class="stat-label">Documents processed</div>
+                </div>
+                <div class="stat-item fade-in">
+                    <div class="stat-number" data-target="98">0</div>
+                    <div class="stat-suffix">%</div>
+                    <div class="stat-label">Accuracy from source material</div>
+                </div>
+                <div class="stat-item fade-in">
+                    <div class="stat-number">4.9<span class="star">★</span></div>
+                    <div class="stat-label">Average user rating</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ CTA ═══════════════ -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="section-label fade-in">GET STARTED</div>
+            <h2 class="section-title fade-in">Ready to study smarter?</h2>
+            <p class="fade-in">
+                Upload your first document and experience the future of studying. 
+                It's free to get started.
+            </p>
+            <div class="fade-in">
+                <a href="chat.html" class="btn-primary" style="font-size: 18px; padding: 18px 40px;">
+                    Start Studying Now <span class="arrow">→</span>
+                </a>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════ FOOTER ═══════════════ -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <a href="#" class="nav-logo" style="color: white;">
+                        <div class="nav-logo-icon">📚</div>
+                        <span class="nav-logo-text">JaPari</span>
+                    </a>
+                    <p>Your AI-powered study companion. Upload documents, ask questions, and learn smarter.</p>
+                </div>
+
+                <div>
+                    <h4>Product</h4>
+                    <ul>
+                        <li><a href="#features">Document Chat</a></li>
+                        <li><a href="#features">Flashcards</a></li>
+                        <li><a href="#features">Study Planner</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4>Resources</h4>
+                    <ul>
+                        <li><a href="#how-it-works">How it Works</a></li>
+                        <li><a href="#">FAQ</a></li>
+                        <li><a href="#">Blog</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h4>Connect</h4>
+                    <ul>
+                        <li><a href="#">GitHub</a></li>
+                        <li><a href="#">Twitter</a></li>
+                        <li><a href="#">Contact</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                © 2025 JaPari. Built with ❤️ for students everywhere.
+            </div>
+        </div>
+    </footer>
+
+    <!-- Script -->
+    <script src="script.js"></script>
+
 </body>
 </html>

@@ -1,5 +1,5 @@
 import sys
-sys.path.append(r"C:\Users\JaiP\OneDrive\Documents\JaPari\src\IR")
+sys.path.append(r"src\IR")
 
 import streamlit as st
 import os

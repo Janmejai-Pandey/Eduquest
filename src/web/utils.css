@@ -1,0 +1,217 @@
+/* ════════════════════════════════════════════════════════════
+   UTILS — Reset, Variables, Animations, Responsive
+   ════════════════════════════════════════════════════════════ */
+
+
+/* ──────────────────────────────────────────
+   1. CSS VARIABLES
+   ────────────────────────────────────────── */
+:root {
+    /* Colors */
+    --bg-cream:     #f5f0eb;
+    --bg-white:     #ffffff;
+    --purple:       #4318D9;
+    --purple-light: #ece6fd;
+    --purple-dark:  #3311b0;
+    --text-dark:    #1a1a2e;
+    --text-body:    #5a5a72;
+    --text-muted:   #8a8a9a;
+    --orange:       #c86b2b;
+    --orange-light: #fdf3e6;
+    --green:        #22c55e;
+    --border:       #e5e2dd;
+
+    /* Radius */
+    --radius:    12px;
+    --radius-lg: 20px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 3px  rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.12);
+
+    /* Transitions */
+    --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+
+/* ──────────────────────────────────────────
+   2. RESET & BASE
+   ────────────────────────────────────────── */
+*, *::before, *::after {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background-color: var(--bg-cream);
+    color: var(--text-dark);
+    line-height: 1.6;
+    overflow-x: hidden;
+}
+
+a {
+    text-decoration: none;
+    color: inherit;
+}
+
+ul {
+    list-style: none;
+}
+
+button {
+    font-family: inherit;
+    cursor: pointer;
+    border: none;
+    background: none;
+}
+
+
+/* ──────────────────────────────────────────
+   3. LAYOUT UTILITIES
+   ────────────────────────────────────────── */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px;
+}
+
+
+/* ──────────────────────────────────────────
+   4. ANIMATIONS
+   ────────────────────────────────────────── */
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateY(24px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes messageIn {
+    from {
+        opacity: 0;
+        transform: translateY(12px) scale(0.97);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes countUp {
+    from {
+        opacity: 0;
+        transform: translateY(20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Scroll reveal utility */
+.fade-in {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.7s ease;
+}
+
+.fade-in.visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+
+/* ──────────────────────────────────────────
+   5. RESPONSIVE — Tablet (≤992px)
+   ────────────────────────────────────────── */
+@media (max-width: 992px) {
+    .hero-inner {
+        grid-template-columns: 1fr;
+        gap: 40px;
+    }
+
+    .hero {
+        padding: 120px 0 60px;
+        min-height: auto;
+    }
+
+    .hero-chat {
+        max-width: 500px;
+    }
+
+    .features-grid {
+        grid-template-columns: 1fr;
+        max-width: 480px;
+        margin: 0 auto;
+    }
+
+    .how-inner {
+        grid-template-columns: 1fr;
+        gap: 40px;
+    }
+
+    .stats-grid {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 32px;
+    }
+
+    .footer-inner {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+
+/* ──────────────────────────────────────────
+   6. RESPONSIVE — Mobile (≤768px)
+   ────────────────────────────────────────── */
+@media (max-width: 768px) {
+    .nav-links {
+        display: none;
+        position: fixed;
+        top: 72px;
+        left: 0;
+        right: 0;
+        background: white;
+        flex-direction: column;
+        padding: 24px;
+        box-shadow: var(--shadow-lg);
+        border-radius: 0 0 16px 16px;
+    }
+
+    .nav-links.open {
+        display: flex;
+    }
+
+    .mobile-toggle {
+        display: block;
+    }
+
+    .hero-buttons {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .hero-checks {
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .stats-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .footer-inner {
+        grid-template-columns: 1fr;
+    }
+}
