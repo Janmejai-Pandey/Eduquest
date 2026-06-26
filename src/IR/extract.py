@@ -22,32 +22,30 @@ def extract_pdf(path):
                 text = text.strip()
                 if text:
                     records.append({
-                        "source_file": os.path.basename(path),
-                        "file_type": "pdf",
-                        "location": f"page {i}",
-                        "text": text,
+                        "source_file":     os.path.basename(path),       # keep for backwards compat
+                        "source_path":     os.path.normpath(path),       # ✅ FULL path (unique)
+                        "source_rel_path": get_relative_path(path),      # ✅ relative path (for display)
+                        "file_type":       "pdf",
+                        "location":        f"page {i}",
+                        "text":            text,
                     })
     except Exception as e:
         print(f"[ERROR] Failed to read PDF {path}: {e}")
     return records
 
-
 def extract_pptx(path):
-    """Extract text slide-wise from a PPTX (including speaker notes)."""
+    """Extract text slide-wise from a PPTX."""
     records = []
     try:
         prs = Presentation(path)
         for i, slide in enumerate(prs.slides, start=1):
             parts = []
-
             for shape in slide.shapes:
                 if shape.has_text_frame:
                     for para in shape.text_frame.paragraphs:
                         line = para.text.strip()
                         if line:
                             parts.append(line)
-
-                # tables inside slides
                 if shape.has_table:
                     for row in shape.table.rows:
                         cells = [c.text.strip() for c in row.cells if c.text.strip()]
@@ -57,14 +55,41 @@ def extract_pptx(path):
             text = "\n".join(parts).strip()
             if text:
                 records.append({
-                    "source_file": os.path.basename(path),
-                    "file_type": "pptx",
-                    "location": f"slide {i}",
-                    "text": text,
+                    "source_file":     os.path.basename(path),
+                    "source_path":     os.path.normpath(path),       # ✅
+                    "source_rel_path": get_relative_path(path),      # ✅
+                    "file_type":       "pptx",
+                    "location":        f"slide {i}",
+                    "text":            text,
                 })
     except Exception as e:
         print(f"[ERROR] Failed to read PPTX {path}: {e}")
     return records
+
+def get_relative_path(full_path):
+    """Get path relative to 'study_material' folder.
+    Example: 'D:/proj/dataset/study_material/CSE/3/Math/lec-1.pdf'
+             → 'CSE/3/Math/lec-1.pdf'
+    """
+    norm = os.path.normpath(full_path)
+    parts = norm.split(os.sep)
+    try:
+        idx = parts.index("study_material")
+        return os.sep.join(parts[idx + 1:])
+    except ValueError:
+        return os.path.basename(full_path)
+
+
+def parse_path_metadata(rel_path):
+    """Extract branch, sem, subject from relative path.
+    'CSE/3/Math/lec-1.pdf' → ('CSE', '3', 'Math')
+    """
+    parts = rel_path.split(os.sep)
+    branch  = parts[0] if len(parts) > 0 else ""
+    sem     = parts[1] if len(parts) > 1 else ""
+    subject = parts[2] if len(parts) > 2 else ""
+    return branch, sem, subject
+
 
 
 def extract_folder(folder):
@@ -105,26 +130,34 @@ def chunk_text(text, max_words=200, overlap=40):
 
 
 def chunk_records(records, max_words=200, overlap=40):
-    """Convert page/slide records into chunk records."""
     chunked = []
     for rec in records:
         pieces = chunk_text(rec["text"], max_words, overlap)
+
+        # Parse branch/sem/subject from path
+        rel_path = rec.get("source_rel_path", "")
+        branch, sem, subject = parse_path_metadata(rel_path)
+
         for j, piece in enumerate(pieces):
             chunked.append({
-                "chunk_id": len(chunked),
-                "source_file": rec["source_file"],
-                "file_type": rec["file_type"],
-                "location": rec["location"],
-                "chunk_index": j,
-                "text": piece,
+                "chunk_id":        len(chunked),
+                "source_file":     rec["source_file"],
+                "source_path":     rec.get("source_path", ""),       # ✅
+                "source_rel_path": rec.get("source_rel_path", ""),   # ✅
+                "branch":          branch,                            # ✅ NEW
+                "semester":        sem,                               # ✅ NEW
+                "subject_folder":  subject,                           # ✅ NEW (from folder)
+                "file_type":       rec["file_type"],
+                "location":        rec["location"],
+                "chunk_index":     j,
+                "text":            piece,
             })
     print(f"Created {len(chunked)} chunks.")
     return chunked
 
-
 # =================Index_Building===================
 
-INDEX_DIR = "resume_index_store"
+INDEX_DIR = "index_store"
 EMBED_MODEL = "all-MiniLM-L6-v2"   # small, fast, good quality
 
 
@@ -173,7 +206,7 @@ def build_indexes(chunks):
 # =================Main function to run the whole pipeline===================
 
 if __name__ == "__main__":
-    folder = "dataset/resume_dataset/ENGINEERING"  # Change this to your folder path
+    folder = "dataset/study_material"  # Change this to your folder path
     print(f"Extracting documents from folder: {folder}")
     records = extract_folder(folder)
 

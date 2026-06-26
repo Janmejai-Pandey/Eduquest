@@ -52,8 +52,11 @@ body {
     font-weight: 600;
 }
 
+/* ══════════════════════════════════════════
+   FILE TREE (hierarchical)
+   ══════════════════════════════════════════ */
 .file-list {
-    max-height: 320px;
+    max-height: 500px;
     overflow-y: auto;
     border: 1px solid var(--border);
     border-radius: 10px;
@@ -61,15 +64,190 @@ body {
     background: var(--bg-cream);
 }
 
-.file-item {
-    padding: 8px 12px;
-    font-size: 13px;
-    color: var(--text-body);
+.file-list::-webkit-scrollbar       { width: 6px; }
+.file-list::-webkit-scrollbar-track { background: transparent; }
+.file-list::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+
+/* ── Tree nodes ────────────────────────── */
+.tree-node {
+    margin-bottom: 2px;
+}
+
+.tree-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
     border-radius: 6px;
+    font-size: 13px;
+    user-select: none;
     transition: var(--transition);
-    word-break: break-all;
-    text-decoration: none;
+    width: 100%;
+    text-align: left;
+    background: none;
+    border: none;
+    color: var(--text-dark);
+    font-family: inherit;
+}
+
+.tree-toggle:hover {
+    background: rgba(67, 24, 217, 0.06);
+}
+
+.tree-arrow {
+    display: inline-block;
+    width: 10px;
+    font-size: 9px;
+    color: var(--text-muted);
+    transition: transform 0.2s;
+}
+
+.tree-node.open > .tree-toggle > .tree-arrow {
+    transform: rotate(90deg);
+}
+
+.tree-children {
+    display: none;
+    padding-left: 14px;
+    border-left: 1.5px solid var(--border);
+    margin-left: 10px;
+    margin-top: 2px;
+}
+
+.tree-node.open > .tree-children {
     display: block;
+}
+
+/* ── Level-specific styling ────────────── */
+.tree-branch > .tree-toggle {
+    font-weight: 700;
+    color: var(--purple);
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tree-sem > .tree-toggle {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 13px;
+}
+
+.tree-subject > .tree-toggle {
+    font-weight: 600;
+    color: var(--text-dark);
+    font-size: 12.5px;
+}
+
+.tree-category > .tree-toggle {
+    font-style: italic;
+    color: var(--text-body);
+    font-size: 12px;
+}
+
+/* ── Counts ────────────────────────────── */
+.tree-count {
+    margin-left: auto;
+    background: var(--purple-light);
+    color: var(--purple);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+/* ── Leaf (file) ───────────────────────── */
+.tree-file {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px;
+    font-size: 12px;
+    color: var(--text-body);
+    border-radius: 5px;
+    cursor: default;
+    word-break: break-word;
+    text-decoration: none;
+    transition: var(--transition);
+    line-height: 1.4;
+}
+
+.tree-file:hover {
+    background: var(--purple-light);
+    color: var(--purple);
+}
+
+.tree-file.with-link {
+    cursor: pointer;
+}
+
+.tree-file .file-emoji {
+    font-size: 11px;
+    flex-shrink: 0;
+}
+
+.tree-file .file-link-icon {
+    font-size: 10px;
+    opacity: 0.5;
+    margin-left: auto;
+}
+
+/* ── Search / filter input ─────────────── */
+.file-search {
+    width: 100%;
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 13px;
+    background: white;
+    transition: var(--transition);
+}
+
+.file-search:focus {
+    outline: none;
+    border-color: var(--purple);
+    box-shadow: 0 0 0 2px rgba(67, 24, 217, 0.1);
+}
+
+/* ── Empty state ───────────────────────── */
+.tree-empty {
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 12px;
+    padding: 20px 12px;
+    font-style: italic;
+}
+
+/* ── Expand all / collapse all ─────────── */
+.tree-controls {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.tree-control-btn {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 11px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: pointer;
+    color: var(--text-body);
+    font-family: inherit;
+    transition: var(--transition);
+}
+
+.tree-control-btn:hover {
+    background: var(--purple-light);
+    color: var(--purple);
+    border-color: var(--purple);
 }
 
 .file-item:hover {

@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   JaPari — Main Script
+   NaKari — Main Script
    ════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -169,6 +169,6 @@
     // ════════════════════════════════════════
     // 6. READY
     // ════════════════════════════════════════
-    console.log('🎓 JaPari website loaded successfully');
+    console.log('🎓 NaKari website loaded successfully');
 
 })();
