@@ -36,24 +36,32 @@ _extract_spec   = importlib.util.spec_from_file_location("extract", _EXTRACT_PAT
 _extract_module = importlib.util.module_from_spec(_extract_spec)
 _extract_spec.loader.exec_module(_extract_module)
 
-# Pull out only the functions we need
 extract_folder = _extract_module.extract_folder
 chunk_records  = _extract_module.chunk_records
 
-# Import job profiles from engineer_data.py
+# ── Load combined job profiles from job_desc package ───────────────────────────
 try:
-    from resume_project.job_desc.engineer_data import job_skill_profiles
+    from resume_project.job_desc import (
+        combined_job_profiles,
+        BRANCH_PROFILES,
+        get_roles_by_branch,
+        get_all_branches,
+    )
+    job_skill_profiles = combined_job_profiles
 except ImportError:
-    # Fallback: load directly via importlib
+    # Fallback to engineer_data only
     _ENG_PATH = os.path.join(SRC_DIR, "resume_project", "job_desc", "engineer_data.py")
     if not os.path.exists(_ENG_PATH):
         raise FileNotFoundError(
-            f"\n❌ engineer_data.py not found at:\n   {_ENG_PATH}"
+            f"\n❌ No job profile files found in:\n   {_ENG_PATH}"
         )
     _eng_spec   = importlib.util.spec_from_file_location("engineer_data", _ENG_PATH)
     _eng_module = importlib.util.module_from_spec(_eng_spec)
     _eng_spec.loader.exec_module(_eng_module)
     job_skill_profiles = _eng_module.job_skill_profiles
+    BRANCH_PROFILES = {"Engineering": job_skill_profiles}
+    def get_roles_by_branch(b): return list(BRANCH_PROFILES.get(b, {}).keys())
+    def get_all_branches(): return list(BRANCH_PROFILES.keys())
 
 
 DATASET_PATH       = os.path.join(ROOT_DIR, "dataset", "resume_dataset", "Engineering")
@@ -141,7 +149,6 @@ def load_resumes_from_dataset(dataset_path: str) -> List[Dict[str, str]]:
 
 
 def clean_resume(text: str) -> str:
-    """Lowercase, remove special chars, collapse spaces, lemmatize."""
     text   = text.lower()
     text   = re.sub(r"[^a-z0-9\s]", " ", text)
     text   = re.sub(r"\s+",         " ", text).strip()
@@ -150,47 +157,35 @@ def clean_resume(text: str) -> str:
 
 
 def clean_skill(skill: str) -> str:
-    """
-    Clean skill name identically to clean_resume()
-    so both sides of matching are in the same format.
-    e.g. "C++" → "c" | "TensorFlow" → "tensorflow"
-    """
     skill  = skill.lower()
     skill  = re.sub(r"[^a-z0-9\s]", " ", skill)
     skill  = re.sub(r"\s+",         " ", skill).strip()
     tokens = [_lemmatizer.lemmatize(tok) for tok in skill.split()]
     return " ".join(tokens)
 
-#skill matching
+
 def extract_skill_score(cleaned_resume: str, job_role: str) -> SkillResult:
-    """
-    Match required skills against cleaned resume.
-
-    Handles BOTH structures of job_skill_profiles:
-      Structure A — plain list:
-        { "Role": ["Python", "SQL", ...] }
-
-      Structure B — dict with skills + weights:
-        { "Role": { "skills": ["Python", ...], "weights": [0.9, ...] } }
-
-    For Structure B, skills sorted by weight descending
-    so highest weight = index 0 = highest priority.
-    """
     role_key: str              = job_role.lower().strip()
     required_skills: List[str] = []
-
 
     for key, value in job_skill_profiles.items():
         if key.lower() in role_key or role_key in key.lower():
 
             if isinstance(value, dict):
-                # Structure B — extract skills list + sort by weights
                 skills_list  = value.get("skills",  [])
-                weights_list = value.get("weights", [])
+                weights_dict = value.get("weights", {})
 
-                if weights_list and len(weights_list) == len(skills_list):
+                if isinstance(weights_dict, dict) and weights_dict:
+                    # Sort by weight descending; unweighted skills go last
                     paired = sorted(
-                        zip(weights_list, skills_list),
+                        skills_list,
+                        key     = lambda s: weights_dict.get(s, 0),
+                        reverse = True,
+                    )
+                    required_skills = paired
+                elif isinstance(weights_dict, list) and len(weights_dict) == len(skills_list):
+                    paired = sorted(
+                        zip(weights_dict, skills_list),
                         key     = lambda x: x[0],
                         reverse = True,
                     )
@@ -199,7 +194,6 @@ def extract_skill_score(cleaned_resume: str, job_role: str) -> SkillResult:
                     required_skills = skills_list
 
             elif isinstance(value, list):
-                # Structure A — use as-is
                 required_skills = value
 
             break
@@ -221,7 +215,6 @@ def extract_skill_score(cleaned_resume: str, job_role: str) -> SkillResult:
     found:   List[str] = []
     missing: List[str] = []
 
-    # ── Match each skill (in priority order) ──────────────────────────────────
     for skill in required_skills:
         cleaned_skill = clean_skill(skill)
 
@@ -253,8 +246,8 @@ def extract_skill_score(cleaned_resume: str, job_role: str) -> SkillResult:
         top2_missing_skills = missing[:2],
     )
 
+
 def tfidf_similarity_score(cleaned_resume: str, job_role: str) -> float:
-    """Cosine similarity between resume and job-role string, scaled 0–100."""
     cleaned_role = clean_resume(job_role)
 
     if not cleaned_resume.strip() or not cleaned_role.strip():
@@ -271,14 +264,6 @@ def tfidf_similarity_score(cleaned_resume: str, job_role: str) -> float:
 
 
 def assign_tiers_by_rank(results: List[Dict]) -> List[Dict]:
-    """
-    Assign tiers relatively by rank position.
-    Top 10%    → Excellent Match ⭐⭐⭐⭐⭐
-    10–30%     → Strong Match    ⭐⭐⭐⭐
-    30–60%     → Moderate Match  ⭐⭐⭐
-    60–80%     → Below Average   ⭐⭐
-    Bottom 20% → Poor Match      ⭐
-    """
     total = len(results)
 
     if total == 1:
@@ -298,16 +283,14 @@ def assign_tiers_by_rank(results: List[Dict]) -> List[Dict]:
 
 
 def classify_tier(score: float) -> str:
-    """Absolute score-based tier — for single resume ranking in user_ranking.py."""
     if   score >= 75: return "Excellent Match ⭐⭐⭐⭐⭐"
     elif score >= 60: return "Strong Match ⭐⭐⭐⭐"
     elif score >= 45: return "Moderate Match ⭐⭐⭐"
     elif score >= 30: return "Below Average ⭐⭐"
     else:             return "Poor Match ⭐"
 
-#core ranking functions
+
 def rank_resume(resume_text: str, job_role: str) -> ResumeRankResult:
-    """Rank a single resume against a job role."""
     if not resume_text or not resume_text.strip():
         raise ValueError("resume_text must not be empty.")
     if not job_role or not job_role.strip():
@@ -337,7 +320,6 @@ def rank_resume(resume_text: str, job_role: str) -> ResumeRankResult:
 
 
 def rank_multiple_resumes(resumes_list: List[Dict[str, str]], job_role: str) -> List[Dict]:
-    """Rank all resumes, sort, assign ranks + relative tiers."""
     results = []
 
     print(f"{Fore.CYAN}{'='*60}")
@@ -370,7 +352,7 @@ def rank_multiple_resumes(resumes_list: List[Dict[str, str]], job_role: str) -> 
     results = assign_tiers_by_rank(results)
     return results
 
-#display
+
 def display_rankings(rankings: List[Dict], top_n: int = None) -> None:
     if not rankings:
         print(Fore.RED + "No rankings to display.")
@@ -425,7 +407,7 @@ def display_rankings(rankings: List[Dict], top_n: int = None) -> None:
     print(f"{Fore.YELLOW}  🔻 Lowest Score   : {Fore.RED}{bottom['candidate_name']}  ({bottom['final_score']:.1f}%)")
     print(f"{Fore.CYAN}{'='*110}\n")
 
-#export in csv
+
 def generate_ranking_report(rankings: List[Dict], filename: str = CSV_PATH) -> None:
     if not rankings:
         print(Fore.RED + "No rankings to export.")
@@ -466,7 +448,7 @@ def generate_ranking_report(rankings: List[Dict], filename: str = CSV_PATH) -> N
 if __name__ == "__main__":
 
     if not job_skill_profiles:
-        print(Fore.RED + "❌ job_skill_profiles is empty. Check engineer_data.py")
+        print(Fore.RED + "❌ job_skill_profiles is empty. Check job_desc/")
         sys.exit(1)
 
     print(f"\n{Fore.CYAN}{'='*60}")
@@ -496,10 +478,8 @@ if __name__ == "__main__":
 
     if not JOB_ROLE:
         print(Fore.RED + f"❌ Could not match '{role_input}' to any available role.")
-        print(Fore.RED + "   Please restart and pick a valid role from the list.")
         sys.exit(1)
 
-    # Get skills list correctly from both Structure A and B
     _role_value = job_skill_profiles[JOB_ROLE]
     if isinstance(_role_value, dict):
         _skills_display = _role_value.get("skills", [])

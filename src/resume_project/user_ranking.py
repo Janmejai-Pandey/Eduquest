@@ -18,13 +18,8 @@ for _p in (ROOT_DIR, SRC_DIR, IR_DIR):
 
 
 _EXTRACT_PATH = os.path.join(IR_DIR, "extract.py")
-
 if not os.path.exists(_EXTRACT_PATH):
-    raise FileNotFoundError(
-        f"\n❌ extract.py not found at:\n"
-        f"   {_EXTRACT_PATH}\n"
-        f"   Make sure extract.py is inside src/IR/"
-    )
+    raise FileNotFoundError(f"\n❌ extract.py not found at:\n   {_EXTRACT_PATH}")
 
 _extract_spec   = importlib.util.spec_from_file_location("extract", _EXTRACT_PATH)
 _extract_module = importlib.util.module_from_spec(_extract_spec)
@@ -35,13 +30,8 @@ extract_pptx   = _extract_module.extract_pptx
 chunk_records  = _extract_module.chunk_records
 
 _RANKING_PATH = os.path.join(os.path.dirname(__file__), "ranking.py")
-
 if not os.path.exists(_RANKING_PATH):
-    raise FileNotFoundError(
-        f"\n❌ ranking.py not found at:\n"
-        f"   {_RANKING_PATH}\n"
-        f"   Make sure ranking.py is inside src/resume_project/"
-    )
+    raise FileNotFoundError(f"\n❌ ranking.py not found at:\n   {_RANKING_PATH}")
 
 _ranking_spec   = importlib.util.spec_from_file_location("ranking", _RANKING_PATH)
 _ranking_module = importlib.util.module_from_spec(_ranking_spec)
@@ -51,18 +41,25 @@ rank_resume        = _ranking_module.rank_resume
 classify_tier      = _ranking_module.classify_tier
 job_skill_profiles = _ranking_module.job_skill_profiles
 RESUME_INDEX_STORE = _ranking_module.RESUME_INDEX_STORE
-CSV_PATH           = _ranking_module.CSV_PATH
+
+# Import branch profiles
+try:
+    BRANCH_PROFILES = _ranking_module.BRANCH_PROFILES
+    get_roles_by_branch = _ranking_module.get_roles_by_branch
+    get_all_branches = _ranking_module.get_all_branches
+except AttributeError:
+    BRANCH_PROFILES = {"All Roles": job_skill_profiles}
+    def get_roles_by_branch(b): return list(BRANCH_PROFILES.get(b, {}).keys())
+    def get_all_branches(): return list(BRANCH_PROFILES.keys())
 
 
 init(autoreset=True)
 
 
+# ============== HELPERS ==============
+
 def get_skills_list(role_value) -> list:
-    """
-    Extract plain skills list from job_skill_profiles value.
-    Structure A → plain list  : return as-is
-    Structure B → dict        : return value["skills"]
-    """
+    """Extract plain skills list from job_skill_profiles value."""
     if isinstance(role_value, dict):
         return role_value.get("skills", [])
     elif isinstance(role_value, list):
@@ -71,16 +68,6 @@ def get_skills_list(role_value) -> list:
 
 
 def extract_resume_text(filepath: str) -> str:
-    """
-    Extract full text from a single resume file.
-    Supports: .pdf  → extract_pdf()   from extract.py
-              .pptx → extract_pptx()  from extract.py
-
-    Steps:
-      1. extract_pdf() / extract_pptx() → page/slide records
-      2. chunk_records()                → overlapping word chunks
-      3. join all chunks                → single full-text string
-    """
     ext = Path(filepath).suffix.lower()
     print(f"{Fore.YELLOW}🔍 Extracting resume : {Fore.WHITE}{filepath}\n")
 
@@ -90,7 +77,6 @@ def extract_resume_text(filepath: str) -> str:
         records = extract_pptx(filepath)
     else:
         print(Fore.RED + f"❌ Unsupported file type '{ext}'.")
-        print(Fore.RED + "   Please provide a .pdf or .pptx file.")
         return ""
 
     if not records:
@@ -105,16 +91,19 @@ def extract_resume_text(filepath: str) -> str:
     return full_text
 
 
-#load existing rankings from csv
+# ============== SEMESTER-BASED CSV ==============
+
+def get_sem_csv_path(semester: str) -> str:
+    """Return CSV path based on user's semester."""
+    os.makedirs(RESUME_INDEX_STORE, exist_ok=True)
+    return os.path.join(RESUME_INDEX_STORE, f"rankings_sem_{semester}.csv")
+
+
 def load_existing_rankings(csv_path: str) -> list:
-    """
-    Read resume_rankings.csv from resume_index_store/.
-    Parses final_score string → float for sorting.
-    Returns empty list if CSV doesn't exist.
-    """
+    """Read sem-specific rankings CSV. Returns empty list if doesn't exist."""
     if not os.path.exists(csv_path):
-        print(Fore.YELLOW + f"⚠  No existing rankings CSV found at {csv_path}")
-        print(Fore.YELLOW + "   Run ranking.py first to generate dataset rankings.\n")
+        print(Fore.YELLOW + f"⚠  No existing rankings for this sem at {csv_path}")
+        print(Fore.YELLOW + "   This will be the first entry — starting fresh.\n")
         return []
 
     rows = []
@@ -131,26 +120,24 @@ def load_existing_rankings(csv_path: str) -> list:
     return rows
 
 
-
-def update_csv_with_user(user_result: dict, csv_path: str):
+def update_csv_with_user(user_result: dict, semester: str):
     """
-    Insert/update user result in CSV, re-sort,
+    Insert/update user result in sem-specific CSV, re-sort,
     recalculate ranks, rewrite file.
-    Returns (user_rank, total) as integers.
     """
-    os.makedirs(RESUME_INDEX_STORE, exist_ok=True)
+    csv_path = get_sem_csv_path(semester)
     existing_rows = load_existing_rankings(csv_path)
 
-    # ── Build user row — fieldnames match ranking.py CSV exactly ─────────────
     user_row = {
         "rank"                  : 0,
         "candidate_name"        : user_result["candidate_name"],
+        "semester"              : semester,
+        "branch"                : user_result.get("branch", "N/A"),
+        "job_role"              : user_result["job_role"],
         "final_score"           : f"{user_result['final_score']:.1f}%",
         "ranking_tier"          : user_result["ranking_tier"],
         "skill_match_percentage": f"{user_result['skill_match_percentage']:.1f}%",
         "tfidf_similarity"      : f"{user_result['tfidf_similarity']:.1f}%",
-
-        # *** FIXED: use top2 + all fields to match ranking.py CSV structure ***
         "top2_found_skills"     : "; ".join(user_result.get("top2_found_skills",  []))
                                     if user_result.get("top2_found_skills")  else "None",
         "top2_missing_skills"   : "; ".join(user_result.get("top2_missing_skills", []))
@@ -159,13 +146,12 @@ def update_csv_with_user(user_result: dict, csv_path: str):
                                     if user_result.get("found_skills")  else "None",
         "all_missing_skills"    : "; ".join(user_result.get("missing_skills", []))
                                     if user_result.get("missing_skills") else "None",
-
         "resume_length"         : user_result["resume_length"],
         "percentile"            : "0%",
         "final_score_float"     : user_result["final_score"],
     }
 
-    # ── Remove duplicate entry for same candidate name ────────────────────────
+    # Remove old entry for same candidate name (case-insensitive)
     existing_rows = [
         r for r in existing_rows
         if r["candidate_name"].strip().lower()
@@ -175,30 +161,30 @@ def update_csv_with_user(user_result: dict, csv_path: str):
     all_rows = existing_rows + [user_row]
     all_rows.sort(key=lambda x: x["final_score_float"], reverse=True)
 
-    # ── Recalculate rank + percentile for all ────────────────────────────────
     total = len(all_rows)
     for i, row in enumerate(all_rows, 1):
         row["rank"]       = i
         row["percentile"] = f"{round((1 - (i - 1) / total) * 100, 1)}%"
 
-    # ── Fieldnames SYNCED with ranking.py ────────────────────────────────────
     fieldnames = [
-        "rank", "candidate_name", "final_score", "ranking_tier",
+        "rank", "candidate_name", "semester", "branch", "job_role",
+        "final_score", "ranking_tier",
         "skill_match_percentage", "tfidf_similarity",
         "top2_found_skills", "top2_missing_skills",
         "all_found_skills", "all_missing_skills",
         "resume_length", "percentile",
     ]
 
-    # ── Rewrite CSV ───────────────────────────────────────────────────────────
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for row in all_rows:
-            # Use .get() with fallback so old rows missing new fields don't crash
             writer.writerow({
                 "rank"                  : row.get("rank",                   ""),
                 "candidate_name"        : row.get("candidate_name",         ""),
+                "semester"              : row.get("semester",               semester),
+                "branch"                : row.get("branch",                 "N/A"),
+                "job_role"              : row.get("job_role",               ""),
                 "final_score"           : row.get("final_score",            ""),
                 "ranking_tier"          : row.get("ranking_tier",           ""),
                 "skill_match_percentage": row.get("skill_match_percentage", ""),
@@ -211,9 +197,8 @@ def update_csv_with_user(user_result: dict, csv_path: str):
                 "percentile"            : row.get("percentile",             ""),
             })
 
-    print(f"{Fore.GREEN}✅ CSV updated with your result → {csv_path}\n")
+    print(f"{Fore.GREEN}✅ CSV updated → {csv_path}\n")
 
-    # ── Find and return user's final rank ─────────────────────────────────────
     user_rank = next(
         (row["rank"] for row in all_rows
          if row["candidate_name"].strip().lower()
@@ -223,9 +208,9 @@ def update_csv_with_user(user_result: dict, csv_path: str):
     return user_rank, total
 
 
-#display the user result
+# ============== DISPLAY ==============
+
 def display_user_result(result: dict, rank: int, total: int) -> None:
-    """Display only the user's ranking result — clean and focused."""
     percentile = round((1 - (rank - 1) / total) * 100, 1)
 
     TIER_COLOR = {
@@ -241,15 +226,15 @@ def display_user_result(result: dict, rank: int, total: int) -> None:
     print(f"{Fore.YELLOW}  📄 YOUR RESUME RANKING RESULT")
     print(f"{Fore.CYAN}{'='*65}\n")
 
-    # ── Basic info + scores ───────────────────────────────────────────────────
     print(f"  {Fore.WHITE}👤 Name              : {Fore.CYAN}{result['candidate_name']}")
+    print(f"  {Fore.WHITE}🎓 Semester           : {Fore.CYAN}{result.get('semester', 'N/A')}")
+    print(f"  {Fore.WHITE}🏛️  Branch             : {Fore.CYAN}{result.get('branch', 'N/A')}")
     print(f"  {Fore.WHITE}🎯 Job Role           : {Fore.CYAN}{result['job_role']}")
     print(f"  {Fore.WHITE}📊 Final Score        : {Fore.CYAN}{result['final_score']:.1f}%")
     print(f"  {Fore.WHITE}🔧 Skill Match        : {Fore.GREEN}{result['skill_match_percentage']:.1f}%")
     print(f"  {Fore.WHITE}📐 TF-IDF Score       : {Fore.BLUE}{result['tfidf_similarity']:.1f}%")
     print(f"  {Fore.WHITE}🏅 Tier               : {tier_color}{result['ranking_tier']}")
 
-    # ── Top 2 priority found skills ───────────────────────────────────────────
     top2_found   = result.get("top2_found_skills",   [])
     top2_missing = result.get("top2_missing_skills", [])
     all_found    = result.get("found_skills",         [])
@@ -260,7 +245,6 @@ def display_user_result(result: dict, rank: int, total: int) -> None:
     print(f"  {Fore.WHITE}❌ Top Skills Missing : "
           f"{Fore.RED}{', '.join(top2_missing) if top2_missing else 'None'}")
 
-    # ── Full lists (collapsed) ────────────────────────────────────────────────
     if len(all_found) > 2:
         print(f"\n  {Fore.WHITE}📋 All Skills Found   : "
               f"{Fore.GREEN}{', '.join(all_found)}")
@@ -268,19 +252,17 @@ def display_user_result(result: dict, rank: int, total: int) -> None:
         print(f"  {Fore.WHITE}📋 All Skills Missing : "
               f"{Fore.RED}{', '.join(all_missing)}")
 
-    # ── Rank + percentile ─────────────────────────────────────────────────────
     print(f"\n{Fore.CYAN}{'─'*65}")
-    print(f"  {Fore.YELLOW}🏆 YOUR RANK          : {Fore.WHITE}{rank} out of {total} candidates")
+    print(f"  {Fore.YELLOW}🏆 YOUR RANK          : {Fore.WHITE}{rank} out of {total} candidates (Sem {result.get('semester', '?')})")
     print(f"  {Fore.YELLOW}📈 YOUR PERCENTILE    : {Fore.WHITE}Top {percentile}%")
 
-    # ── Standing message ──────────────────────────────────────────────────────
     print(f"\n  ", end="")
     if rank == 1:
-        print(f"{Fore.GREEN}🥇 You are the TOP candidate among all applicants!")
+        print(f"{Fore.GREEN}🥇 You are the TOP candidate among all applicants in your sem!")
     elif percentile >= 75:
-        print(f"{Fore.GREEN}🎉 You are in the TOP 25% of all candidates — great work!")
+        print(f"{Fore.GREEN}🎉 You are in the TOP 25% of your semester — great work!")
     elif percentile >= 50:
-        print(f"{Fore.YELLOW}👍 You are in the TOP half of all candidates. Keep it up!")
+        print(f"{Fore.YELLOW}👍 You are in the TOP half of your semester. Keep it up!")
     elif percentile >= 25:
         print(f"{Fore.MAGENTA}📌 You are in the bottom half. Work on the missing skills above.")
     else:
@@ -289,77 +271,127 @@ def display_user_result(result: dict, rank: int, total: int) -> None:
     print(f"{Fore.CYAN}{'='*65}\n")
 
 
+# ============== INPUT HELPERS ==============
+
+def ask_semester() -> str:
+    """Ask user for their semester."""
+    print(f"\n{Fore.YELLOW}🎓 Which semester are you in?\n")
+    print(f"   {Fore.CYAN}[3]{Fore.WHITE} Semester 3")
+    print(f"   {Fore.CYAN}[4]{Fore.WHITE} Semester 4")
+
+    while True:
+        choice = input(f"\n{Fore.CYAN}   Enter semester (3 or 4) : {Fore.WHITE}").strip()
+        if choice in ("3", "4"):
+            return choice
+        print(Fore.RED + "   Invalid. Please enter 3 or 4.")
+
+
+def ask_branch() -> str:
+    """Ask user to pick a branch."""
+    branches = get_all_branches()
+    print(f"\n{Fore.YELLOW}🏛️  Which branch / domain are you targeting?\n")
+    for i, b in enumerate(branches, 1):
+        print(f"   {Fore.CYAN}[{i}]{Fore.WHITE} {b}")
+
+    while True:
+        choice = input(
+            f"\n{Fore.CYAN}   Select branch (1-{len(branches)}) : {Fore.WHITE}"
+        ).strip()
+        try:
+            idx = int(choice) - 1
+            if 0 <= idx < len(branches):
+                return branches[idx]
+        except ValueError:
+            pass
+        print(Fore.RED + "   Invalid. Try again.")
+
+
+def ask_role_within_branch(branch: str) -> str:
+    """Ask user to pick a role within the selected branch."""
+    roles = get_roles_by_branch(branch)
+    if not roles:
+        print(Fore.RED + f"❌ No roles found for branch '{branch}'.")
+        sys.exit(1)
+
+    print(f"\n{Fore.YELLOW}💼 Available roles in {branch}:\n")
+    for i, role in enumerate(roles, 1):
+        print(f"   {Fore.CYAN}[{i}]{Fore.WHITE} {role}")
+
+    while True:
+        choice = input(
+            f"\n{Fore.CYAN}   Enter role name or number : {Fore.WHITE}"
+        ).strip()
+
+        if choice.isdigit():
+            idx = int(choice) - 1
+            if 0 <= idx < len(roles):
+                return roles[idx]
+        else:
+            for r in roles:
+                if choice.lower() in r.lower():
+                    return r
+
+        print(Fore.RED + "   Invalid selection. Try again.")
+
+
+# ============== MAIN ==============
 
 if __name__ == "__main__":
 
     print(f"\n{Fore.CYAN}{'='*65}")
     print(f"{Fore.YELLOW}  🎓 RESUME RANKER — Check Your Standing")
-    print(f"{Fore.CYAN}{'='*65}\n")
+    print(f"{Fore.CYAN}{'='*65}")
 
-    # ── Step 1 : Candidate name ───────────────────────────────────────────────
+    if not job_skill_profiles:
+        print(Fore.RED + "❌ job_skill_profiles is empty. Check job_desc/")
+        sys.exit(1)
+
+    # ── Step 1: Semester ─────────────────────────────────────────────────────
+    semester = ask_semester()
+    print(f"{Fore.GREEN}✅ Selected Semester : {Fore.WHITE}{semester}")
+
+    # ── Step 2: Branch ───────────────────────────────────────────────────────
+    branch = ask_branch()
+    print(f"{Fore.GREEN}✅ Selected Branch   : {Fore.WHITE}{branch}")
+
+    # ── Step 3: Job Role ─────────────────────────────────────────────────────
+    selected_role = ask_role_within_branch(branch)
+    _skills_display = get_skills_list(job_skill_profiles[selected_role])
+    print(f"{Fore.GREEN}✅ Selected Role     : {Fore.WHITE}{selected_role}")
+    print(f"{Fore.GREEN}📋 Required Skills   : {Fore.WHITE}{', '.join(_skills_display[:10])}...\n")
+
+    # ── Step 4: Candidate name ───────────────────────────────────────────────
     user_name = input(f"{Fore.WHITE}👤 Enter your name : {Fore.CYAN}").strip()
     if not user_name:
         user_name = "User"
 
-    # ── Step 2 : Resume file path ─────────────────────────────────────────────
+    # ── Step 5: Resume path ──────────────────────────────────────────────────
     print(f"\n{Fore.WHITE}📁 Enter the full path to your resume file (.pdf or .pptx)")
     print(f"{Fore.WHITE}   Example : C:/Users/you/Documents/my_resume.pdf")
     resume_path = input(f"{Fore.CYAN}   Path : ").strip().strip('"').strip("'")
 
     if not os.path.exists(resume_path):
         print(Fore.RED + f"\n❌ File not found : '{resume_path}'")
-        print(Fore.RED + "   Please check the path and try again.")
         sys.exit(1)
 
-    # ── Step 3 : Job role selection ───────────────────────────────────────────
-    if not job_skill_profiles:
-        print(Fore.RED + "❌ job_skill_profiles is empty. Check engineer_data.py")
-        sys.exit(1)
-
-    print(f"\n{Fore.YELLOW}💼 Available Job Positions:\n")
-    roles = list(job_skill_profiles.keys())
-    for i, role in enumerate(roles, 1):
-        print(f"   {Fore.CYAN}{i}.{Fore.WHITE} {role}")
-
-    print(f"\n{Fore.WHITE}🎯 Which position are you applying for?")
-    role_choice = input(f"{Fore.CYAN}   Enter Role Name or Number : ").strip()
-
-    selected_role = None
-    if role_choice.isdigit():
-        idx = int(role_choice) - 1
-        if 0 <= idx < len(roles):
-            selected_role = roles[idx]
-    else:
-        for r in roles:
-            if role_choice.lower() in r.lower():
-                selected_role = r
-                break
-
-    if not selected_role:
-        print(Fore.RED + "❌ Invalid selection. Please restart and pick a role from the list.")
-        sys.exit(1)
-
-    # ── Display selected role + skills (handles Structure A & B) ─────────────
-    _skills_display = get_skills_list(job_skill_profiles[selected_role])
-    print(f"\n{Fore.GREEN}✅ Selected Role     : {Fore.WHITE}{selected_role}")
-    print(f"{Fore.GREEN}📋 Required Skills   : {Fore.WHITE}{', '.join(_skills_display)}\n")
-
-    # ── Step 4 : Extract resume text ─────────────────────────────────────────
+    # ── Step 6: Extract resume text ──────────────────────────────────────────
     resume_text = extract_resume_text(resume_path)
     if not resume_text:
         print(Fore.RED + "❌ Could not extract text from your resume. Exiting.")
         sys.exit(1)
 
-    # ── Step 5 : Rank via ranking.py ─────────────────────────────────────────
+    # ── Step 7: Rank via ranking.py ──────────────────────────────────────────
     print(f"{Fore.YELLOW}⚙️  Calculating your ranking score for '{selected_role}'...\n")
     result = rank_resume(resume_text, selected_role)
 
     # Attach extra fields
     result["candidate_name"] = user_name
     result["resume_length"]  = len(resume_text.split())
+    result["semester"]       = semester
+    result["branch"]         = branch
 
-    # ── Step 6 : Update CSV ───────────────────────────────────────────────────
-    user_rank, total = update_csv_with_user(result, CSV_PATH)
+    # ── Step 8: Update sem-specific CSV ──────────────────────────────────────
+    user_rank, total = update_csv_with_user(result, semester)
 
-    # ── Step 7 : Display result ───────────────────────────────────────────────
+    # ── Step 9: Display ──────────────────────────────────────────────────────
     display_user_result(result, user_rank, total)
