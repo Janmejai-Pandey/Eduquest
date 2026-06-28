@@ -23,6 +23,7 @@ def all_imports():
     sys.path.insert(0, CHAT_DIR)
     sys.path.insert(0, SUMMARISER_DIR)
     sys.path.insert(0, QUIZ_DIR)
+    sys.path.insert(0, RESUME_DIR)
     
 def chat_imports():
     sys.path.insert(0, IR_DIR)
