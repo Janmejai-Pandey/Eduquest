@@ -1,9 +1,3 @@
-"""
-quiz_main.py
-CLI for quiz generation.
-Run from src/IR/:  python quiz_main.py
-"""
-
 import os
 import sys
 import re
@@ -40,7 +34,7 @@ def wrap(text, width=WRAP):
 
 def print_banner():
     print(Fore.CYAN + "=" * 60)
-    print(Fore.CYAN + "   QUIZ GENERATOR  |  Groq LLM")
+    print(Fore.CYAN + "   QUIZ GENERATOR  |  GEMINI LLM")
     print(Fore.CYAN + "=" * 60)
     print(Fore.YELLOW + "   Interactive quiz from lectures, tutorials & PYQs")
     print(Fore.YELLOW + "   Auto-sized | Inline answers | Live scoring")

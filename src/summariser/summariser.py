@@ -1,9 +1,3 @@
-"""
-summariser.py
-Lecture PDF / PPTX summariser.
-Streams files directly from Google Drive (no local download).
-"""
-
 import os
 import io
 import json
@@ -14,6 +8,8 @@ import requests
 import pdfplumber
 from pptx import Presentation
 
+from config import all_imports
+all_imports()
 from llm import get_answer
 
 
@@ -242,7 +238,7 @@ def extract_pptx_from_buffer(buffer: io.BytesIO, source_name: str) -> List[Dict]
     return records
 
 
-def extract_text_from_gdrive(lecture_info: Dict) -> Tuple[str, str]:
+def extract_text_from_gdrive(lecture_info: Dict) -> tuple[str, str]:
     """
     Stream file from Google Drive and extract its text.
     Returns (extracted_text, view_url).
@@ -289,9 +285,7 @@ def extract_text_from_gdrive(lecture_info: Dict) -> Tuple[str, str]:
 
 # ============== SUMMARISE ==============
 
-def summarise_single_lecture(
-    semester: str, lecture_info: Dict
-) -> Tuple[str, bool, str]:
+def summarise_single_lecture(semester: str, lecture_info: Dict) -> tuple[str, bool, str]:
     """
     Summarise a single lecture file streamed from Google Drive.
     Returns (summary_text, success_flag, view_url).

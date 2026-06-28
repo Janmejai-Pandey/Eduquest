@@ -1,10 +1,3 @@
-"""
-summarise_main.py
-CLI for lecture summarisation.
-Streams files directly from Google Drive - no local downloads.
-Run from src/IR/:  python summarise_main.py
-"""
-
 import os
 import sys
 import textwrap

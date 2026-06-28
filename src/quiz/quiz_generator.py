@@ -1,10 +1,5 @@
-"""
-quiz_generator.py
-Quiz generator for lectures, tutorials, and PYQs.
-Streams files directly from Google Drive (no local downloads).
-"""
-
 import os
+import sys
 import io
 import json
 import re
@@ -14,15 +9,15 @@ import requests
 import pdfplumber
 from pptx import Presentation
 
+from config import chat_imports
+chat_imports()
 from llm import get_answer
 
-
+CURRENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC_DIR = os.path.join(CURRENT_DIR, "..")
 # ============== PATHS ==============
 
-BASE_DATASET = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)),
-    "..", "..", "dataset", "study_material", "CSE"
-)
+BASE_DATASET = os.path.join(CURRENT_DIR, "..", "..", "dataset", "study_material", "CSE")
 
 SEM_FOLDERS = {
     "3": os.path.join(BASE_DATASET, "3"),
