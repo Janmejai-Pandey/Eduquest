@@ -2,19 +2,8 @@ import os
 import sys
 import json
 
-# ─────────────────────────────────────────────
-# Path setup — index_store is at project root
-# ─────────────────────────────────────────────
-# Get project root (NaKari/)
-CURRENT_DIR  = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
-IR_DIR      = os.path.join(PROJECT_ROOT, "src", "IR")
-RESUME_PROJECT_DIR = os.path.join(PROJECT_ROOT, "src", "resume_project")
-
-sys.path.append(IR_DIR)
-sys.path.append(RESUME_PROJECT_DIR)
-
-# Change to project root so 'index_store/...' works
+from config import PROJECT_ROOT,all_imports
+all_imports()
 os.chdir(PROJECT_ROOT)
 # ─────────────────────────────────────────────
 # Now import everything
@@ -23,7 +12,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Any
-from src.IR.chatbot import RAGChatbot
+from chatbot import RAGChatbot
 
 
 # ─────────────────────────────────────────────
@@ -120,11 +109,11 @@ def load_file_links():
     print(f"✅ Total: {len(mapping)} entries, {len(name_index)} unique filenames")
 
     # Find duplicates for awareness
-    dupes = {n: keys for n, keys in name_index.items() if len(keys) > 1}
-    if dupes:
-        print(f"⚠️  {len(dupes)} filenames appear in multiple branches/semesters:")
-        for name, keys in list(dupes.items())[:10]:
-            print(f"   '{name}' → {keys}")
+    # dupes = {n: keys for n, keys in name_index.items() if len(keys) > 1}
+    # if dupes:
+    #     print(f"⚠️  {len(dupes)} filenames appear in multiple branches/semesters:")
+    #     for name, keys in list(dupes.items())[:10]:
+    #         print(f"   '{name}' → {keys}")
 
     return mapping, name_index
 
@@ -353,7 +342,7 @@ def normalize_category(cat: str) -> str:
 # ════════════════════════════════════════════════════════
 
 from fastapi import UploadFile, File, Form
-from src.resume_project.resume_api import (
+from resume_api import (
     analyze_resume,
     get_available_roles,
     get_csv_stats,
