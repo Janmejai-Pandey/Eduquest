@@ -1,4 +1,5 @@
 dataset/**
 !dataset/**/
 !dataset/**/gdrive_links.json
-__pycache__/
+**/__pycache__/
+*.pyc
