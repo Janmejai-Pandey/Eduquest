@@ -1,0 +1,2 @@
+rank,candidate_name,semester,branch,job_role,final_score,ranking_tier,skill_match_percentage,tfidf_similarity,top2_found_skills,top2_missing_skills,all_found_skills,all_missing_skills,resume_length,percentile
+1,jane,3,CSE,Frontend Developer,8.1%,Poor Match ⭐,11.5%,0.0%,html; css,javascript; react,html; css; git,javascript; react; typescript; responsive design; tailwind; jest; rest api; figma; angular; vue; next.js; redux; bootstrap; sass; webpack; vite; accessibility; web performance; cypress; storybook; ui/ux; graphql; node.js,471,100.0%
