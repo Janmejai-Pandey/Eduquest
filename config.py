@@ -8,7 +8,7 @@ SUMMARISER_DIR = os.path.join(SRC_DIR, "summariser")
 QUIZ_DIR = os.path.join(SRC_DIR, "quiz")
 RESUME_DIR = os.path.join(SRC_DIR, "resume_project")
 
-GEMINI_API_KEY = "AQ.Ab8RN6J8Kh8wq3MJ1kyvxJR0qRPUsLvA5hOHYIQT3fag_Ey_oQ"
+GEMINI_API_KEY = "AQ.Ab8RN6JO6_nt4umhs4V8D_JLzy3ZzvI07WADkgodl8dpDT4qnw"
 
 #import all the directories to sys.path
 sys.path.insert(0, SRC_DIR)
