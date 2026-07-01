@@ -219,95 +219,64 @@ def reset_chat(session_id: str = "default"):
 
 @app.get("/stats")
 def get_stats():
-    """Build tree using FULL paths so duplicate filenames don't collapse."""
+    """Build tree using chunk metadata (works for all branches/sems)."""
     try:
         with open("index_store/chunks.json", encoding="utf-8") as f:
             chunks = json.load(f)
 
-        # ✅ Group chunks by their full path (unique identifier)
-        indexed_files = {}   # rel_path → {filename, branch, sem, subject_folder}
-        for c in chunks:
-            rel_path = c.get("source_rel_path") or c.get("source_file")
-            if rel_path not in indexed_files:
-                indexed_files[rel_path] = {
-                    "name":           c.get("source_file", ""),
-                    "rel_path":       rel_path,
-                    "branch":         c.get("branch", ""),
-                    "semester":       c.get("semester", ""),
-                    "subject_folder": c.get("subject_folder", ""),
-                }
-
-        # Build tree from FILE_LINKS but match using both name AND path
+        # ✅ Use chunk metadata directly
         tree = {}
-        files_with_links = []
+        seen_files_per_group = {}   # dedupe
 
-        for composite_key, info in FILE_LINKS.items():
-            # Match by name (since gdrive_links uses filename)
-            matched_paths = [
-                rp for rp, idx_info in indexed_files.items()
-                if idx_info["name"] == info["name"]
-                   and idx_info["branch"].lower()   == info["branch"].lower()
-                   and idx_info["semester"].lower() == info["semester"].lower()
-            ]
+        for chunk in chunks:
+            branch   = chunk.get("branch",   "") or "Unknown"
+            sem      = chunk.get("semester", "") or "?"
+            subject  = chunk.get("subject",  "") or "Other"
+            category = normalize_category(chunk.get("category", ""))
+            fname    = chunk.get("source_file", "")
 
-            if not matched_paths:
+            if not fname:
                 continue
 
-            for rel_path in matched_paths:
-                branch   = info["branch"]   or "Unknown"
-                sem      = info["semester"] or "?"
-                subject  = info["subject"]  or "Other"
-                category = normalize_category(info["category"])
+            group_key = (branch, sem, subject, category)
+            if group_key not in seen_files_per_group:
+                seen_files_per_group[group_key] = set()
 
-                tree.setdefault(branch, {}) \
-                    .setdefault(sem, {}) \
-                    .setdefault(subject, {}) \
-                    .setdefault(category, []) \
-                    .append({
-                        "name": info["name"],
-                        "url":  info["url"],
-                        "path": rel_path,
-                    })
-                files_with_links.append(info)
+            if fname in seen_files_per_group[group_key]:
+                continue   # already added
+            seen_files_per_group[group_key].add(fname)
 
-        # Files in index but not in any gdrive_links.json
-        linked_paths = set()
-        for composite_key, info in FILE_LINKS.items():
-            for rp, idx_info in indexed_files.items():
-                if (idx_info["name"] == info["name"] and
-                    idx_info["branch"].lower()   == info["branch"].lower() and
-                    idx_info["semester"].lower() == info["semester"].lower()):
-                    linked_paths.add(rp)
-
-        unlinked_paths = [rp for rp in indexed_files if rp not in linked_paths]
-
-        for rp in unlinked_paths:
-            idx_info = indexed_files[rp]
-            branch   = idx_info["branch"]         or "Unknown"
-            sem      = idx_info["semester"]       or "?"
-            subject  = idx_info["subject_folder"] or "Other"
+            # Get URL from FILE_LINKS
+            url_key = f"{branch}|{sem}|{subject}|{fname}"
+            url = ""
+            if url_key in FILE_LINKS:
+                url = FILE_LINKS[url_key].get("url", "")
 
             tree.setdefault(branch, {}) \
                 .setdefault(sem, {}) \
                 .setdefault(subject, {}) \
-                .setdefault("Other", []) \
+                .setdefault(category, []) \
                 .append({
-                    "name": idx_info["name"],
-                    "url":  "",
-                    "path": rp,
+                    "name": fname,
+                    "url":  url,
                 })
 
+        # Count total unique files
+        all_files = set()
+        for chunk in chunks:
+            all_files.add(chunk.get("source_file", ""))
+
         return {
-            "total_files":  len(indexed_files),
+            "total_files":  len(all_files),
             "total_chunks": len(chunks),
-            "files":        files_with_links,
             "tree":         tree,
         }
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))    
+        raise HTTPException(status_code=500, detail=str(e))
     
+       
 def normalize_category(cat: str) -> str:
     """Normalize various category names to consistent labels."""
     if not cat:
@@ -455,3 +424,78 @@ def debug_duplicates():
         "sample_duplicates_in_index": dict(list(duplicates_in_index.items())[:5]),
         "sample_duplicates_NOT_in_index": dict(list(duplicates_NOT_in_index.items())[:5]),
     }
+    
+    
+# ════════════════════════════════════════════════════════
+# QUIZ ENDPOINTS (uses indexed data)
+# ════════════════════════════════════════════════════════
+
+from quiz.quiz_web import (
+    get_browse_tree     as quiz_browse_tree,
+    generate_quiz_indexed,
+    save_quiz_indexed,
+    score_quiz          as quiz_score_answers,
+)
+
+
+class QuizIndexedRequest(BaseModel):
+    branch:         str | None       = None
+    sem:            str | None       = None
+    subject:        str | None       = None
+    category:       str | None       = None
+    question_types: list[str] | None = None
+    difficulty:     str              = "Medium"
+    num_questions:  int | None       = None
+    save_to_disk:   bool | None      = False
+
+
+class QuizScoreRequest(BaseModel):
+    questions:    list[dict]
+    user_answers: list
+
+
+@app.get("/quiz/browse")
+def quiz_browse_endpoint():
+    try:
+        return {"tree": quiz_browse_tree()}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/quiz/generate")
+def quiz_generate_endpoint(req: QuizIndexedRequest):
+    try:
+        result = generate_quiz_indexed(
+            branch         = req.branch,
+            sem            = req.sem,
+            subject        = req.subject,
+            category       = req.category,
+            question_types = req.question_types or ["MCQ", "True/False", "Short Answer"],
+            difficulty     = req.difficulty,
+            num_questions  = req.num_questions,
+        )
+        if not result.get("success"):
+            raise HTTPException(status_code=400, detail=result.get("error", "Generation failed"))
+
+        if req.save_to_disk:
+            try:
+                saved = save_quiz_indexed(result)
+                result["saved_path"] = os.path.relpath(saved, PROJECT_ROOT) if saved else None
+            except Exception as e:
+                print(f"Save failed: {e}")
+        return result
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/quiz/score")
+def quiz_score_endpoint(req: QuizScoreRequest):
+    """Score user's quiz answers."""
+    try:
+        return quiz_score_answers(req.questions, req.user_answers)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

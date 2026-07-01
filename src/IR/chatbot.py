@@ -64,10 +64,10 @@ WEB_SYSTEM_PROMPT = """You are a helpful AI assistant with access to Google Sear
 
 Rules:
 1. Use web information to answer accurately.
-2. After EACH factual claim, add a citation like [1], [2], etc.
-3. At the end, list "## Sources" with numbered links.
-4. Use clear Markdown formatting.
-5. Be concise but thorough.
+2. Use clear Markdown formatting.
+3. Be concise but thorough.
+4. DO NOT include a "Sources" or "References" section — those will be displayed separately.
+5. DO NOT include raw URLs in your answer.
 6. End with: "ℹ️ This answer was generated using Google Search."
 """
 
@@ -313,21 +313,39 @@ class RAGChatbot:
         answer  = result["answer"]
         sources = result["sources"]
 
-        # Convert Gemini grounding sources → our format
+        # ✅ Build numbered sources block (markdown)
+        sources_md = "\n\n---\n\n### 🔗 Sources\n\n"
+        for i, s in enumerate(sources, 1):
+            domain = s.get("domain", "link")
+            title  = s.get("title",  domain) or domain
+            url    = s["url"]
+            # Display: "1. [Title](url) — domain.com"
+            sources_md += f"{i}. [{title}]({url}) — *{domain}*\n"
+
+        # ✅ Convert sources for sidebar/sources panel
         pseudo_sources = []
         for i, s in enumerate(sources, 1):
             pseudo_sources.append({
-                "source_file":    f"🌐 {s['title']}" if s['title'] else f"🌐 Web Source {i}",
-                "location":       "Google Search",
+                "source_file":    f"🌐 {s.get('title') or s.get('domain') or f'Source {i}'}",
+                "location":       s.get("domain", "Web"),
                 "score":          0.5,
                 "bm25_score":     0.0,
                 "semantic_score": 0.0,
-                "text":           f"Web source: {s['url']}",
+                "text":           f"From {s.get('domain', 'web')}",
                 "url":            s["url"],
                 "subject":        "Web",
                 "semester":       "",
                 "is_web":         True,
             })
+
+        # ✅ Compose final answer
+        final_answer = (
+            f"> 🌐 _Not found in local docs — searched Google._\n\n"
+            f"{answer}"
+            f"{sources_md}"
+        )
+
+        return final_answer, pseudo_sources
 
         final_answer = (
             f"> 🌐 _Not found in local docs — searched Google._\n\n"

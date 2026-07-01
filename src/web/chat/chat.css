@@ -792,3 +792,95 @@ body {
 .markdown-body blockquote em {
     color: #92400e;
 }
+
+/* ══════════════════════════════════════════
+   WEB SOURCES — clean chip-style links
+   ══════════════════════════════════════════ */
+
+/* The "Sources" heading at end of web answers */
+.markdown-body h3 {
+    font-size: 14px;
+    color: var(--purple);
+    margin-top: 20px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+}
+
+/* Numbered source list — chip style */
+.markdown-body ol {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    counter-reset: source-counter;
+}
+
+.markdown-body ol li {
+    counter-increment: source-counter;
+    background: white;
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--purple);
+    padding: 8px 14px 8px 36px;
+    margin-bottom: 6px;
+    border-radius: 8px;
+    font-size: 13px;
+    position: relative;
+    transition: var(--transition);
+}
+
+.markdown-body ol li::before {
+    content: counter(source-counter);
+    position: absolute;
+    left: 10px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 20px;
+    height: 20px;
+    background: var(--purple);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.markdown-body ol li:hover {
+    border-left-color: var(--orange);
+    transform: translateX(2px);
+    box-shadow: var(--shadow-sm);
+}
+
+.markdown-body ol li a {
+    color: var(--text-dark);
+    text-decoration: none;
+    font-weight: 500;
+    display: inline-block;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+.markdown-body ol li a:hover {
+    color: var(--purple);
+    text-decoration: underline;
+}
+
+.markdown-body ol li em {
+    color: var(--text-muted);
+    font-size: 11px;
+    font-style: normal;
+    text-transform: lowercase;
+}
+
+/* Fix the long URLs that might still appear */
+.markdown-body p a,
+.markdown-body li a {
+    word-break: break-word;
+    overflow-wrap: break-word;
+}

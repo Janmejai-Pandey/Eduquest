@@ -11,10 +11,59 @@ import faiss
 from rank_bm25 import BM25Okapi
 from sentence_transformers import SentenceTransformer
 
+# ─────────────────────────────────────────────
+# Path parsing helper
+# ─────────────────────────────────────────────
+def parse_path_metadata(full_path: str) -> dict[str, str]:
+    """
+    Extract branch, semester, subject, category from folder structure.
 
-def extract_pdf(path):
+    Expected structure:
+      .../dataset/study_material/<BRANCH>/<SEM>/<SUBJECT>/<CATEGORY>/file.pdf
+
+    Example:
+      "D:/JaPari/dataset/study_material/CSE/3/DSA/Lectures/lec-1.pdf"
+      → {branch: 'CSE', semester: '3', subject: 'DSA', category: 'Lectures'}
+    """
+    norm = os.path.normpath(full_path)
+    parts = norm.split(os.sep)
+
+    metadata = {
+        "branch":   "",
+        "semester": "",
+        "subject":  "",
+        "category": "",
+        "rel_path": "",
+    }
+
+    try:
+        sm_idx = parts.index("study_material")
+        after = parts[sm_idx + 1:]   # everything after study_material
+
+        # relative path from study_material
+        metadata["rel_path"] = os.sep.join(after)
+
+        # Parse folder hierarchy
+        if len(after) >= 1: metadata["branch"]   = after[0]
+        if len(after) >= 2: metadata["semester"] = after[1]
+        if len(after) >= 3: metadata["subject"]  = after[2]
+        if len(after) >= 4: metadata["category"] = after[3]
+
+    except ValueError:
+        # Not under study_material — use filename only
+        metadata["rel_path"] = os.path.basename(full_path)
+
+    return metadata
+
+
+# ─────────────────────────────────────────────
+# PDF extraction (with path metadata)
+# ─────────────────────────────────────────────
+def extract_pdf(path: str) -> list[dict]:
     """Extract text page-wise from a PDF."""
     records = []
+    meta = parse_path_metadata(path)
+
     try:
         with pdfplumber.open(path) as pdf:
             for i, page in enumerate(pdf.pages, start=1):
@@ -22,9 +71,13 @@ def extract_pdf(path):
                 text = text.strip()
                 if text:
                     records.append({
-                        "source_file":     os.path.basename(path),       # keep for backwards compat
-                        "source_path":     os.path.normpath(path),       # ✅ FULL path (unique)
-                        "source_rel_path": get_relative_path(path),      # ✅ relative path (for display)
+                        "source_file":     os.path.basename(path),   # keep filename for display
+                        "source_path":     os.path.normpath(path),   # ✅ full path (unique)
+                        "source_rel_path": meta["rel_path"],         # ✅ relative to study_material
+                        "branch":          meta["branch"],           # ✅ NEW
+                        "semester":        meta["semester"],         # ✅ NEW
+                        "subject":         meta["subject"],          # ✅ NEW
+                        "category":        meta["category"],         # ✅ NEW
                         "file_type":       "pdf",
                         "location":        f"page {i}",
                         "text":            text,
@@ -33,19 +86,27 @@ def extract_pdf(path):
         print(f"[ERROR] Failed to read PDF {path}: {e}")
     return records
 
-def extract_pptx(path):
-    """Extract text slide-wise from a PPTX."""
+
+# ─────────────────────────────────────────────
+# PPTX extraction (with path metadata)
+# ─────────────────────────────────────────────
+def extract_pptx(path: str) -> list[dict]:
+    """Extract text slide-wise from a PPTX (including tables)."""
     records = []
+    meta = parse_path_metadata(path)
+
     try:
         prs = Presentation(path)
         for i, slide in enumerate(prs.slides, start=1):
             parts = []
+
             for shape in slide.shapes:
                 if shape.has_text_frame:
                     for para in shape.text_frame.paragraphs:
                         line = para.text.strip()
                         if line:
                             parts.append(line)
+
                 if shape.has_table:
                     for row in shape.table.rows:
                         cells = [c.text.strip() for c in row.cells if c.text.strip()]
@@ -56,8 +117,12 @@ def extract_pptx(path):
             if text:
                 records.append({
                     "source_file":     os.path.basename(path),
-                    "source_path":     os.path.normpath(path),       # ✅
-                    "source_rel_path": get_relative_path(path),      # ✅
+                    "source_path":     os.path.normpath(path),
+                    "source_rel_path": meta["rel_path"],
+                    "branch":          meta["branch"],
+                    "semester":        meta["semester"],
+                    "subject":         meta["subject"],
+                    "category":        meta["category"],
                     "file_type":       "pptx",
                     "location":        f"slide {i}",
                     "text":            text,
@@ -66,52 +131,32 @@ def extract_pptx(path):
         print(f"[ERROR] Failed to read PPTX {path}: {e}")
     return records
 
-def get_relative_path(full_path):
-    """Get path relative to 'study_material' folder.
-    Example: 'D:/proj/dataset/study_material/CSE/3/Math/lec-1.pdf'
-             → 'CSE/3/Math/lec-1.pdf'
-    """
-    norm = os.path.normpath(full_path)
-    parts = norm.split(os.sep)
-    try:
-        idx = parts.index("study_material")
-        return os.sep.join(parts[idx + 1:])
-    except ValueError:
-        return os.path.basename(full_path)
 
-
-def parse_path_metadata(rel_path):
-    """Extract branch, sem, subject from relative path.
-    'CSE/3/Math/lec-1.pdf' → ('CSE', '3', 'Math')
-    """
-    parts = rel_path.split(os.sep)
-    branch  = parts[0] if len(parts) > 0 else ""
-    sem     = parts[1] if len(parts) > 1 else ""
-    subject = parts[2] if len(parts) > 2 else ""
-    return branch, sem, subject
-
-
-
-def extract_folder(folder):
-    """Extract all PDFs and PPTXs in a folder."""
+# ─────────────────────────────────────────────
+# Extract all files in folder (recursive)
+# ─────────────────────────────────────────────
+def extract_folder(folder: str) -> list[dict]:
+    """Extract all PDFs and PPTXs recursively from a folder."""
     all_records = []
     for root, _, files in os.walk(folder):
         for fname in files:
             path = os.path.join(root, fname)
             lower = fname.lower()
+
             if lower.endswith(".pdf"):
-                print(f"Extracting PDF : {fname}")
+                print(f"📄 Extracting PDF : {fname}")
                 all_records.extend(extract_pdf(path))
             elif lower.endswith(".pptx"):
-                print(f"Extracting PPTX: {fname}")
+                print(f"📊 Extracting PPTX: {fname}")
                 all_records.extend(extract_pptx(path))
-    print(f"Extracted {len(all_records)} pages/slides total.")
+
+    print(f"\n✅ Extracted {len(all_records)} pages/slides from all files")
     return all_records
 
 
-# ===============Chunking=================== 
+# =============== Chunking ===============
 
-def chunk_text(text, max_words=200, overlap=40):
+def chunk_text(text: str, max_words: int = 200, overlap: int = 40) -> list[str]:
     """Split text into overlapping word chunks."""
     words = text.split()
     if len(words) <= max_words:
@@ -129,30 +174,27 @@ def chunk_text(text, max_words=200, overlap=40):
     return chunks
 
 
-def chunk_records(records, max_words=200, overlap=40):
+def chunk_records(records: list[dict], max_words: int = 200, overlap: int = 40) -> list[dict]:
+    """Convert page/slide records into chunk records — PRESERVES all metadata."""
     chunked = []
     for rec in records:
         pieces = chunk_text(rec["text"], max_words, overlap)
-
-        # Parse branch/sem/subject from path
-        rel_path = rec.get("source_rel_path", "")
-        branch, sem, subject = parse_path_metadata(rel_path)
-
         for j, piece in enumerate(pieces):
             chunked.append({
                 "chunk_id":        len(chunked),
-                "source_file":     rec["source_file"],
-                "source_path":     rec.get("source_path", ""),       # ✅
+                "source_file":     rec.get("source_file",     ""),
+                "source_path":     rec.get("source_path",     ""),   # ✅
                 "source_rel_path": rec.get("source_rel_path", ""),   # ✅
-                "branch":          branch,                            # ✅ NEW
-                "semester":        sem,                               # ✅ NEW
-                "subject_folder":  subject,                           # ✅ NEW (from folder)
-                "file_type":       rec["file_type"],
-                "location":        rec["location"],
+                "branch":          rec.get("branch",          ""),   # ✅
+                "semester":        rec.get("semester",        ""),   # ✅
+                "subject":         rec.get("subject",         ""),   # ✅
+                "category":        rec.get("category",        ""),   # ✅
+                "file_type":       rec.get("file_type",       ""),
+                "location":        rec.get("location",        ""),
                 "chunk_index":     j,
                 "text":            piece,
             })
-    print(f"Created {len(chunked)} chunks.")
+    print(f"✅ Created {len(chunked)} chunks with full metadata")
     return chunked
 
 # =================Index_Building===================

@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quiz Generator — JaPari</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../utils.css">
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="quiz.css">
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <div class="nav-logo-icon">📚</div>
+                <span class="nav-logo-text">JaPari</span>
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../chat/chat.html">Chat</a></li>
+                <li><a href="quiz.html" class="active">Quiz</a></li>
+                <li><a href="../resume/resume.html">Resume Rank</a></li>
+            </ul>
+            <button class="mobile-toggle" id="mobileToggle">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="quiz-hero">
+        <div class="container">
+            <div class="quiz-badge">🎯 AI-Powered Quiz Generator</div>
+            <h1>Test your <em>knowledge.</em></h1>
+            <p>Generate quizzes instantly from your indexed lectures, tutorials, and PYQs. Choose question types and difficulty — get tested in seconds.</p>
+        </div>
+    </section>
+
+    <!-- SETUP -->
+    <section class="quiz-section" id="setupSection">
+        <div class="container">
+            <div class="quiz-card">
+                <h2>📋 Quiz Settings</h2>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>🎓 Branch</label>
+                        <select id="branchSelect">
+                            <option value="">— All branches —</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>📅 Semester</label>
+                        <select id="semSelect">
+                            <option value="">— All semesters —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>📚 Subject</label>
+                        <select id="subjectSelect">
+                            <option value="">— All subjects —</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>📁 Category</label>
+                        <select id="categorySelect">
+                            <option value="">— All categories —</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>📝 Question Types (pick one or more)</label>
+                    <div class="type-grid">
+                        <label class="type-chip selected">
+                            <input type="checkbox" value="MCQ" checked>
+                            🔘 MCQ
+                        </label>
+                        <label class="type-chip">
+                            <input type="checkbox" value="True/False">
+                            ✓✗ True/False
+                        </label>
+                        <label class="type-chip">
+                            <input type="checkbox" value="Fill in the Blanks">
+                            ___ Fill Blanks
+                        </label>
+                        <label class="type-chip">
+                            <input type="checkbox" value="Short Answer">
+                            📝 Short
+                        </label>
+                        <label class="type-chip">
+                            <input type="checkbox" value="Long Answer">
+                            📃 Long
+                        </label>
+                        <label class="type-chip">
+                            <input type="checkbox" value="Numerical">
+                            🔢 Numerical
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>🎚️ Difficulty</label>
+                        <div class="diff-buttons">
+                            <button type="button" class="diff-btn"        data-diff="Easy">😌 Easy</button>
+                            <button type="button" class="diff-btn active" data-diff="Medium">🤔 Medium</button>
+                            <button type="button" class="diff-btn"        data-diff="Hard">🔥 Hard</button>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>📊 Number of Questions: <span id="numQVal">Auto</span></label>
+                        <input type="range" id="numQuestions" min="0" max="25" value="0">
+                        <div class="range-hint">0 = auto-decide based on content</div>
+                    </div>
+                </div>
+
+                <label class="checkbox-label">
+                    <input type="checkbox" id="saveToDisk">
+                    <span>💾 Save quiz as Markdown file</span>
+                </label>
+
+                <button class="generate-btn" id="generateBtn">
+                    🚀 Generate Quiz
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- LOADING -->
+    <section class="quiz-section" id="loadingSection" style="display:none;">
+        <div class="container">
+            <div class="loading-card">
+                <div class="big-spinner"></div>
+                <h3>Generating your quiz…</h3>
+                <p>AI is reading your indexed content</p>
+            </div>
+        </div>
+    </section>
+
+    <!-- QUIZ -->
+    <section class="quiz-section" id="quizSection" style="display:none;">
+        <div class="container">
+            <div class="quiz-card">
+                <div class="quiz-header">
+                    <div>
+                        <h2 id="quizTitle">Quiz</h2>
+                        <p id="quizMeta">—</p>
+                    </div>
+                    <div class="progress-circle">
+                        <div class="progress-text"><span id="currentQ">1</span>/<span id="totalQ">5</span></div>
+                    </div>
+                </div>
+
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill" style="width:0%;"></div>
+                </div>
+
+                <div class="question-container" id="questionContainer"></div>
+
+                <div class="quiz-nav">
+                    <button class="nav-btn" id="prevBtn" disabled>← Previous</button>
+                    <button class="nav-btn"          id="revealBtn">👁️ Show Answer</button>
+                    <button class="nav-btn primary" id="nextBtn">Next →</button>
+                    <button class="nav-btn primary" id="finishBtn" style="display:none;">✓ Finish & Score</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="quiz-section" id="resultsSection" style="display:none;">
+        <div class="container">
+            <div class="quiz-card">
+                <div class="result-header">
+                    <h2>🎉 Quiz Complete!</h2>
+                    <p id="resultMeta">—</p>
+                </div>
+
+                <div class="score-card" id="scoreCard"></div>
+
+                <div class="sources-block" id="sourcesBlock"></div>
+
+                <h3 style="margin-top:24px;">📋 Question Review</h3>
+                <div class="review-list" id="reviewList"></div>
+            </div>
+
+            <div class="result-actions">
+                <button class="nav-btn primary" id="retryBtn">🔄 Another Quiz</button>
+                <button class="nav-btn" id="downloadBtn">💾 Download .md</button>
+                <button class="nav-btn" id="printBtn">🖨️ Print</button>
+            </div>
+        </div>
+    </section>
+
+    <script src="../script.js"></script>
+    <script src="quiz.js"></script>
+</body>
+</html>
