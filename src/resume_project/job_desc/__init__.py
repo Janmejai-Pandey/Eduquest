@@ -1,56 +1,66 @@
 """
 __init__.py
-Auto-loads all branch-wise job profiles and exposes a combined dict.
-
-Usage:
-    from resume_project.job_desc import combined_job_profiles
-    profile = combined_job_profiles["Software Developer"]
+Auto-discovers and loads ALL *_data.py files in this folder.
+No manual imports needed — just drop a new file and it's picked up.
 """
 
-from .cse_data import job_skill_profiles as cse_profiles
-from .it_data import job_skill_profiles as it_profiles
-from .mnc_data import job_skill_profiles as mnc_profiles
-from .ai_data import job_skill_profiles as ai_profiles
-from .ml_data import job_skill_profiles as ml_profiles
-from .robotics_data import job_skill_profiles as robotics_profiles
-from .ece_data import job_skill_profiles as ece_profiles
+import os
+import importlib.util
 
-# Try to load the original engineer_data too (for backward compat)
-try:
-    from .engineer_data import job_skill_profiles as engineer_profiles
-except ImportError:
-    engineer_profiles = {}
+# ── Auto-discover all *_data.py files in this folder ─────────────────────────
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+BRANCH_PROFILES = {}
 
-
-# Combine all profiles into one dict, tagged by branch
-BRANCH_PROFILES = {
-    "CSE": cse_profiles,
-    "IT": it_profiles,
-    "MNC": mnc_profiles,
-    "AI": ai_profiles,
-    "ML": ml_profiles,
-    "Robotics": robotics_profiles,
-    "ECE": ece_profiles,
+# Map from filename (without _data.py) → display branch name
+BRANCH_NAME_MAP = {
+    "cse":       "CSE",
+    "it":        "IT",
+    "mnc":       "MNC",
+    "ai":        "AI",
+    "ml":        "ML",
+    "robotics":  "Robotics",
+    "ece":       "ECE",
+    "engineer":  "Engineering (legacy)",  # backward compat
 }
 
-# Flat combined dict (all roles in one place)
+for _fname in sorted(os.listdir(_current_dir)):
+    if not _fname.endswith("_data.py"):
+        continue
+
+    _branch_key = _fname.replace("_data.py", "").lower()
+    _display_name = BRANCH_NAME_MAP.get(_branch_key, _branch_key.upper())
+
+    _full_path = os.path.join(_current_dir, _fname)
+    _spec = importlib.util.spec_from_file_location(f"_jd_{_branch_key}", _full_path)
+    _mod  = importlib.util.module_from_spec(_spec)
+    try:
+        _spec.loader.exec_module(_mod)
+        _profiles = getattr(_mod, "job_skill_profiles", None)
+        if _profiles and isinstance(_profiles, dict):
+            BRANCH_PROFILES[_display_name] = _profiles
+    except Exception as e:
+        print(f"[job_desc] ⚠  Failed to load {_fname}: {e}")
+
+
+# ── Flat combined dict of all roles across all branches ──────────────────────
 combined_job_profiles = {}
-for branch, profiles in BRANCH_PROFILES.items():
-    for role, details in profiles.items():
-        combined_job_profiles[role] = details
-
-# Also expose engineer_profiles for backward compat with old ranking.py
-if engineer_profiles:
-    for role, details in engineer_profiles.items():
-        if role not in combined_job_profiles:
-            combined_job_profiles[role] = details
+for _branch, _profiles in BRANCH_PROFILES.items():
+    for _role, _details in _profiles.items():
+        # Prefer newer branches over legacy 'Engineering' if role duplicates
+        if _role not in combined_job_profiles or _branch != "Engineering (legacy)":
+            combined_job_profiles[_role] = _details
 
 
+# ── Public helper functions ──────────────────────────────────────────────────
 def get_roles_by_branch(branch: str) -> list:
-    """Get list of role names for a given branch."""
     return list(BRANCH_PROFILES.get(branch, {}).keys())
 
 
 def get_all_branches() -> list:
-    """Get list of all available branches."""
     return list(BRANCH_PROFILES.keys())
+
+
+# ── Debug info on import (comment out later if noisy) ────────────────────────
+if __name__ != "__main__":
+    _total_roles = sum(len(p) for p in BRANCH_PROFILES.values())
+    print(f"[job_desc] ✅ Loaded {len(BRANCH_PROFILES)} branches, {_total_roles} total roles")

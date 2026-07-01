@@ -23,6 +23,7 @@ for _p in (ROOT_DIR, SRC_DIR, IR_DIR):
         sys.path.insert(0, _p)
 
 
+# ── Load extract.py ─────────────────────────────────────────────────────────
 _EXTRACT_PATH = os.path.join(IR_DIR, "extract.py")
 
 if not os.path.exists(_EXTRACT_PATH):
@@ -39,31 +40,34 @@ _extract_spec.loader.exec_module(_extract_module)
 extract_folder = _extract_module.extract_folder
 chunk_records  = _extract_module.chunk_records
 
-# ── Load combined job profiles from job_desc package ───────────────────────────
-try:
-    from resume_project.job_desc import (
-        combined_job_profiles,
-        BRANCH_PROFILES,
-        get_roles_by_branch,
-        get_all_branches,
+
+# ── Load job_desc/__init__.py DIRECTLY (bypass package import issues) ────────
+_JOB_DESC_INIT = os.path.join(
+    os.path.dirname(__file__), "job_desc", "__init__.py"
+)
+
+if not os.path.exists(_JOB_DESC_INIT):
+    raise FileNotFoundError(
+        f"\n❌ job_desc/__init__.py not found at:\n"
+        f"   {_JOB_DESC_INIT}\n"
+        f"   Make sure the __init__.py file exists in job_desc/"
     )
-    job_skill_profiles = combined_job_profiles
-except ImportError:
-    # Fallback to engineer_data only
-    _ENG_PATH = os.path.join(SRC_DIR, "resume_project", "job_desc", "engineer_data.py")
-    if not os.path.exists(_ENG_PATH):
-        raise FileNotFoundError(
-            f"\n❌ No job profile files found in:\n   {_ENG_PATH}"
-        )
-    _eng_spec   = importlib.util.spec_from_file_location("engineer_data", _ENG_PATH)
-    _eng_module = importlib.util.module_from_spec(_eng_spec)
-    _eng_spec.loader.exec_module(_eng_module)
-    job_skill_profiles = _eng_module.job_skill_profiles
-    BRANCH_PROFILES = {"Engineering": job_skill_profiles}
-    def get_roles_by_branch(b): return list(BRANCH_PROFILES.get(b, {}).keys())
-    def get_all_branches(): return list(BRANCH_PROFILES.keys())
+
+_jd_spec = importlib.util.spec_from_file_location("job_desc_pkg", _JOB_DESC_INIT)
+_jd_mod  = importlib.util.module_from_spec(_jd_spec)
+
+# Make sure the module's __file__ is set so its os.path.dirname works
+_jd_mod.__file__ = _JOB_DESC_INIT
+_jd_spec.loader.exec_module(_jd_mod)
+
+combined_job_profiles = _jd_mod.combined_job_profiles
+BRANCH_PROFILES       = _jd_mod.BRANCH_PROFILES
+get_roles_by_branch   = _jd_mod.get_roles_by_branch
+get_all_branches      = _jd_mod.get_all_branches
+job_skill_profiles    = combined_job_profiles
 
 
+# ── Paths ───────────────────────────────────────────────────────────────────
 DATASET_PATH       = os.path.join(ROOT_DIR, "dataset", "resume_dataset", "Engineering")
 RESUME_INDEX_STORE = os.path.join(ROOT_DIR, "resume_index_store")
 CSV_PATH           = os.path.join(RESUME_INDEX_STORE, "dataset_rankings.csv")
@@ -169,14 +173,13 @@ def extract_skill_score(cleaned_resume: str, job_role: str) -> SkillResult:
     required_skills: List[str] = []
 
     for key, value in job_skill_profiles.items():
-        if key.lower() in role_key or role_key in key.lower():
+        if key.lower() == role_key or key.lower() in role_key or role_key in key.lower():
 
             if isinstance(value, dict):
                 skills_list  = value.get("skills",  [])
                 weights_dict = value.get("weights", {})
 
                 if isinstance(weights_dict, dict) and weights_dict:
-                    # Sort by weight descending; unweighted skills go last
                     paired = sorted(
                         skills_list,
                         key     = lambda s: weights_dict.get(s, 0),
@@ -446,7 +449,6 @@ def generate_ranking_report(rankings: List[Dict], filename: str = CSV_PATH) -> N
 
 
 if __name__ == "__main__":
-
     if not job_skill_profiles:
         print(Fore.RED + "❌ job_skill_profiles is empty. Check job_desc/")
         sys.exit(1)
