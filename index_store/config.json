@@ -1,0 +1,5 @@
+{
+  "embed_model": "BAAI/bge-m3",
+  "embed_dim": 1024,
+  "num_chunks": 8138
+}

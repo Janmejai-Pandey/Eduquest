@@ -1,191 +1,129 @@
-import os
-import re
-import requests
-from urllib.parse import urlparse
-
-from google import genai
-from google.genai import types
+import time
+import llm_config as config
 
 
 # ─────────────────────────────────────────────
-# Config
+# Startup warnings
 # ─────────────────────────────────────────────
-from config import GEMINI_API_KEY
-MODEL_NAME     = "gemini-2.5-flash"
-
-if not GEMINI_API_KEY:
-    print("⚠️  GEMINI_API_KEY not")
-
-client = genai.Client(api_key=GEMINI_API_KEY)
+if not config.GROQ_API_KEY:
+    print("⚠️  GROQ_API_KEY not set — will use OpenRouter directly")
+if not config.OPENROUTER_API_KEY:
+    print("⚠️  OPENROUTER_API_KEY not set — no fallback available")
 
 
 # ─────────────────────────────────────────────
-# Helper: Resolve Gemini's redirect URLs → real URLs
+# Lazy clients
 # ─────────────────────────────────────────────
-_redirect_cache = {}   # cache resolved URLs to avoid repeat requests
+_groq_client       = None
+_openrouter_client = None
 
-def resolve_redirect_url(url: str, timeout: int = 5) -> str:
-    """
-    Gemini returns vertexaisearch.cloud.google.com redirect URLs.
-    Follow them once to get the real destination.
-    """
-    if not url:
-        return ""
 
-    # Only resolve Google redirect URLs
-    if "vertexaisearch.cloud.google.com" not in url:
-        return url
+def get_groq_client():
+    global _groq_client
+    if _groq_client is None and config.GROQ_API_KEY:
+        from groq import Groq
+        _groq_client = Groq(api_key=config.GROQ_API_KEY)
+    return _groq_client
 
-    # Check cache
-    if url in _redirect_cache:
-        return _redirect_cache[url]
 
-    try:
-        # HEAD request follows redirects but is faster than GET
-        resp = requests.head(
-            url,
-            allow_redirects = True,
-            timeout         = timeout,
-            headers         = {"User-Agent": "Mozilla/5.0"},
+def get_openrouter_client():
+    global _openrouter_client
+    if _openrouter_client is None and config.OPENROUTER_API_KEY:
+        from openai import OpenAI
+        _openrouter_client = OpenAI(
+            base_url = "https://openrouter.ai/api/v1",
+            api_key  = config.OPENROUTER_API_KEY,
         )
-        real_url = resp.url
-        _redirect_cache[url] = real_url
-        return real_url
-    except Exception as e:
-        print(f"⚠️  Could not resolve {url[:60]}...: {e}")
-        return url   # fallback to original
-
-
-def get_domain_name(url: str) -> str:
-    """Extract clean domain name from URL.
-    'https://www.openai.com/blog/gpt-5' → 'openai.com'
-    """
-    try:
-        parsed = urlparse(url)
-        domain = parsed.netloc
-        # Remove www. prefix
-        if domain.startswith("www."):
-            domain = domain[4:]
-        return domain
-    except Exception:
-        return url
+    return _openrouter_client
 
 
 # ─────────────────────────────────────────────
-# Convert messages → Gemini format
+# Provider calls
 # ─────────────────────────────────────────────
-def convert_messages(messages: list[dict]) -> tuple:
-    system_instruction = ""
-    contents = []
+def _call_groq(messages: list) -> str:
+    client = get_groq_client()
+    if not client:
+        raise RuntimeError("Groq client not available")
 
-    for msg in messages:
-        role    = msg["role"]
-        content = msg["content"]
-
-        if role == "system":
-            system_instruction += content + "\n\n"
-        elif role == "user":
-            contents.append({"role": "user",  "parts": [{"text": content}]})
-        elif role == "assistant":
-            contents.append({"role": "model", "parts": [{"text": content}]})
-
-    return system_instruction.strip(), contents
+    response = client.chat.completions.create(
+        model       = config.GROQ_MODEL,
+        messages    = messages,
+        temperature = config.GROQ_TEMPERATURE,
+        max_tokens  = config.GROQ_MAX_TOKENS,
+        reasoning_effort="none",
+    )
+    return response.choices[0].message.content.strip()
 
 
-# ─────────────────────────────────────────────
-# 1. Regular LLM answer (no web)
-# ─────────────────────────────────────────────
-def get_answer(messages: list[dict]) -> str:
-    try:
-        system_instruction, contents = convert_messages(messages)
+def _call_openrouter(messages: list) -> str:
+    client = get_openrouter_client()
+    if not client:
+        raise RuntimeError("OpenRouter client not available")
 
-        config = types.GenerateContentConfig(
-            temperature        = 0.3,
-            max_output_tokens  = 2048,
-            system_instruction = system_instruction if system_instruction else None,
-        )
-
-        response = client.models.generate_content(
-            model    = MODEL_NAME,
-            contents = contents,
-            config   = config,
-        )
-
-        return response.text.strip() if response.text else "(empty response)"
-
-    except Exception as e:
-        return f"[LLM ERROR] {type(e).__name__}: {str(e)}"
+    response = client.chat.completions.create(
+        model       = config.OPENROUTER_MODEL,
+        messages    = messages,
+        temperature = config.OPENROUTER_TEMPERATURE,
+        max_tokens  = config.OPENROUTER_MAX_TOKENS,
+        extra_headers = {
+            "HTTP-Referer": config.OPENROUTER_APP_URL,
+            "X-Title":      config.OPENROUTER_APP_NAME,
+        },
+    )
+    return response.choices[0].message.content.strip()
 
 
 # ─────────────────────────────────────────────
-# 2. LLM + Google Search grounding
+# Main entry point
 # ─────────────────────────────────────────────
-def get_answer_with_web_search(messages: list[dict]) -> dict:
-    try:
-        system_instruction, contents = convert_messages(messages)
+def get_answer(messages: list) -> str:
+    """Try Groq → fall back to OpenRouter."""
+    last_error = None
 
-        google_search_tool = types.Tool(google_search=types.GoogleSearch())
+    # ── Try Groq ──
+    if config.GROQ_API_KEY:
+        for attempt in range(config.LLM_MAX_RETRIES):
+            try:
+                print(f"🤖 Groq → {config.GROQ_MODEL}")
+                return _call_groq(messages)
+            except Exception as e:
+                last_error = e
+                err_msg = str(e).lower()
+                if "rate" in err_msg or "429" in err_msg:
+                    if attempt < config.LLM_MAX_RETRIES - 1:
+                        print(f"   ⏳ Rate limited, waiting {config.LLM_RETRY_DELAY}s...")
+                        time.sleep(config.LLM_RETRY_DELAY)
+                        continue
+                print(f"   ❌ Groq failed: {e}")
+                break
 
-        config = types.GenerateContentConfig(
-            temperature        = 0.3,
-            max_output_tokens  = 2048,
-            tools              = [google_search_tool],
-            system_instruction = system_instruction if system_instruction else None,
-        )
+    # ── Fallback: OpenRouter ──
+    if config.OPENROUTER_API_KEY:
+        for attempt in range(config.LLM_MAX_RETRIES):
+            try:
+                print(f"🔄 OpenRouter → {config.OPENROUTER_MODEL}")
+                return _call_openrouter(messages)
+            except Exception as e:
+                last_error = e
+                err_msg = str(e).lower()
+                if "rate" in err_msg or "429" in err_msg:
+                    if attempt < config.LLM_MAX_RETRIES - 1:
+                        print(f"   ⏳ Rate limited, waiting {config.LLM_RETRY_DELAY + 1}s...")
+                        time.sleep(config.LLM_RETRY_DELAY + 1)
+                        continue
+                print(f"   ❌ OpenRouter failed: {e}")
+                break
 
-        response = client.models.generate_content(
-            model    = MODEL_NAME,
-            contents = contents,
-            config   = config,
-        )
+    return f"[LLM ERROR] All providers failed. Last error: {last_error}"
 
-        answer = response.text.strip() if response.text else "(empty response)"
 
-        # ✅ Remove auto-generated sources section from answer
-        # (we'll display sources separately in UI)
-        answer = re.sub(
-            r"##?\s*(Sources?|References?|Citations?)\s*\n.*$",
-            "",
-            answer,
-            flags=re.IGNORECASE | re.DOTALL,
-        ).strip()
-
-        # ✅ Extract + resolve grounding sources
-        sources = []
-        try:
-            grounding = response.candidates[0].grounding_metadata
-            if grounding and grounding.grounding_chunks:
-                for chunk in grounding.grounding_chunks:
-                    if chunk.web:
-                        original_url = chunk.web.uri or ""
-                        real_url     = resolve_redirect_url(original_url)
-                        domain       = get_domain_name(real_url)
-
-                        sources.append({
-                            "title":  chunk.web.title or domain,
-                            "url":    real_url,
-                            "domain": domain,
-                        })
-        except (AttributeError, IndexError):
-            pass
-
-        # Dedupe by URL
-        seen = set()
-        unique_sources = []
-        for s in sources:
-            if s["url"] not in seen:
-                seen.add(s["url"])
-                unique_sources.append(s)
-
-        return {
-            "answer":  answer,
-            "sources": unique_sources,
-            "found":   bool(answer and len(unique_sources) > 0),
-        }
-
-    except Exception as e:
-        return {
-            "answer":  f"[WEB SEARCH ERROR] {type(e).__name__}: {str(e)}",
-            "sources": [],
-            "found":   False,
-        }
+# ─────────────────────────────────────────────
+# Web search stub (kept for compatibility)
+# ─────────────────────────────────────────────
+def get_answer_with_web_search(messages: list) -> dict:
+    """No native web search in Groq/OpenRouter — returns regular answer."""
+    return {
+        "answer":  get_answer(messages),
+        "sources": [],
+        "found":   False,
+    }

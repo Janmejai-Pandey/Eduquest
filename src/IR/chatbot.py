@@ -1,14 +1,14 @@
-import os
 import re
-import sys
-
+import llm_config as config
 from search import HybridSearcher
-from llm import get_answer, get_answer_with_web_search
+from llm    import get_answer, get_answer_with_web_search
 
-from config import all_imports
-all_imports()
+
+# ═════════════════════════════════════════════════════════════
+# IMPORTS — Summarizer (optional)
+# ═════════════════════════════════════════════════════════════
 try:
-    from summariser import (           
+    from summariser_indexed import (
         load_gdrive_links,
         get_subjects,
         get_lecture_files,
@@ -17,30 +17,14 @@ try:
         SEM_FOLDERS,
     )
     SUMMARIZER_AVAILABLE = True
-    print(f"✅ Summarizer loaded — {len(SEM_FOLDERS)} sem folder(s)")
+    print(f"✅ Indexed summariser loaded — {len(SEM_FOLDERS)} sem folder(s)")
 except Exception as e:
-    import traceback
     print(f"⚠️  Summarizer failed: {e}")
-    traceback.print_exc()
     SUMMARIZER_AVAILABLE = False
 
 
-# ═════════════════════════════════════════════════════════════
-# WEB SEARCH STATUS
-# ═════════════════════════════════════════════════════════════
-WEB_SEARCH_AVAILABLE = True
-print("✅ Gemini web search grounding enabled")
+WEB_SEARCH_AVAILABLE = config.ENABLE_WEB_FALLBACK
 
-
-# ═════════════════════════════════════════════════════════════
-# TUNEABLE PARAMETERS
-# ═════════════════════════════════════════════════════════════
-TOP_K               = 5
-MAX_HISTORY_TURNS   = 6
-SEARCH_ALPHA        = 0.5
-MIN_SCORE           = 0.1
-WEB_FALLBACK_SCORE  = 0.3
-ENABLE_WEB_FALLBACK = True
 
 # ═════════════════════════════════════════════════════════════
 # SYSTEM PROMPTS
@@ -54,27 +38,24 @@ Rules:
    "I could not find relevant information in the provided documents."
 3. Always mention the source file and location (page/slide) of your answer.
 4. Be factual, structured, and concise.
-5. If multiple sources support the answer, mention all of them.
-6. For follow-up questions, use both the context and conversation history.
-7. If asked to summarize, provide bullet points.
+5. For follow-up questions, use both the context and conversation history.
+6. If asked to summarize, provide bullet points.
 """
 
 
-WEB_SYSTEM_PROMPT = """You are a helpful AI assistant with access to Google Search.
+WEB_SYSTEM_PROMPT = """You are a helpful AI assistant.
+The user asked a question that wasn't found in local documents.
 
 Rules:
-1. Use web information to answer accurately.
-2. Use clear Markdown formatting.
-3. Be concise but thorough.
-4. DO NOT include a "Sources" or "References" section — those will be displayed separately.
-5. DO NOT include raw URLs in your answer.
-6. End with: "ℹ️ This answer was generated using Google Search."
+1. Answer using your general knowledge.
+2. Be factual and concise.
+3. Format your response in clean Markdown.
+4. End with: "ℹ️ This answer is not from your local documents."
 """
 
 
 GENERAL_KNOWLEDGE_PROMPT = """You are a helpful AI assistant.
-The user asked something not found in their local documents
-and web search didn't return useful results.
+The user asked something not found in their local documents.
 
 Rules:
 1. Answer based on your general knowledge.
@@ -85,37 +66,57 @@ Rules:
 
 
 # ═════════════════════════════════════════════════════════════
-# INTENT DETECTION & PARSING
+# INTENT DETECTION
 # ═════════════════════════════════════════════════════════════
 
+# Summary keywords
 SUMMARY_KEYWORDS = [
     "summari[sz]e", "summary of", "summarise", "summarize",
     "give me a summary", "give summary", "make summary",
-    "tl;dr", "quick notes", "revise",
+    "make notes", "quick notes", "revision notes", "revise",
+    "tl;dr", "explain briefly", "brief overview",
 ]
 
 SUMMARY_PATTERN = re.compile(
-    r"\b(?:" + "|".join(SUMMARY_KEYWORDS) + r")\b",
-    re.IGNORECASE,
+    r"\b(?:" + "|".join(SUMMARY_KEYWORDS) + r")\b", re.IGNORECASE,
 )
 
+# Semester patterns
 SEM_PATTERN = re.compile(
     r"\b(?:sem(?:ester)?|sm)\s*[-:]?\s*(\d+)\b|\b(\d+)(?:st|nd|rd|th)?\s+sem(?:ester)?\b",
     re.IGNORECASE,
 )
 
+# Lecture number patterns
 LECTURE_NUM_PATTERN = re.compile(
     r"\b(?:lec(?:ture)?|lesson|chapter|ch|class)\s*[-:#]?\s*(\d+)\b",
     re.IGNORECASE,
 )
 
+# All lectures pattern
 ALL_PATTERN = re.compile(
     r"\b(?:all|every|complete|whole|entire|full|each)\b\s*(?:lec(?:ture)?s?|lessons?|chapters?|classes?)?",
     re.IGNORECASE,
 )
 
 
-# Follow-up patterns — user wants to modify the LAST summary
+# Clarification patterns (short user replies filling in missing info)
+CLARIFICATION_PATTERNS = [
+    # "of sem 3", "from sem 4", "in semester 3"
+    re.compile(r"\b(?:of|from|in|for)?\s*sem(?:ester)?\s*\d+", re.IGNORECASE),
+    # "sem 3", "3rd sem"
+    re.compile(r"\b\d+(?:st|nd|rd|th)?\s*sem(?:ester)?\b", re.IGNORECASE),
+    re.compile(r"\bsem(?:ester)?\s*[-:]?\s*\d+\b", re.IGNORECASE),
+    # "of DBMS", "for DSA" — subject fill-in
+    re.compile(r"\b(?:of|for|from|in)\s+[A-Za-z][A-Za-z\s&/-]{1,40}$", re.IGNORECASE),
+    # Just a number "3", "4"
+    re.compile(r"^\s*\d+\s*$"),
+    # "lecture 3", "lec 5", "all"
+    re.compile(r"^\s*(?:lec(?:ture)?|all|every)\s*\d*\s*$", re.IGNORECASE),
+]
+
+
+# Follow-up on completed summary
 BRIEF_KEYWORDS = [
     "brief", "short", "shorter", "concise", "tl;dr", "tldr",
     "in points", "bullet", "key points only", "just the points",
@@ -132,19 +133,21 @@ FOLLOWUP_PATTERN = re.compile(
 
 
 def detect_summary_intent(query: str) -> bool:
-    """Check if user is asking for a NEW summary."""
     return bool(SUMMARY_PATTERN.search(query))
 
 
+def is_clarification_response(query: str) -> bool:
+    """Detect if short user message is providing missing summary info."""
+    q = query.strip()
+    if not q or len(q.split()) > 8:
+        return False
+    return any(p.search(q) for p in CLARIFICATION_PATTERNS)
+
+
 def is_followup_on_summary(query: str) -> bool:
-    """Detect if user wants to modify the PREVIOUS summary."""
-    query_lower = query.lower().strip()
-
-    # Short queries with follow-up keywords
-    if len(query_lower.split()) <= 8 and FOLLOWUP_PATTERN.search(query_lower):
+    q = query.lower().strip()
+    if len(q.split()) <= 8 and FOLLOWUP_PATTERN.search(q):
         return True
-
-    # Specific short phrases
     short_followups = [
         "shorten it", "make shorter", "shorter please",
         "in brief", "give brief", "brief version",
@@ -153,11 +156,10 @@ def is_followup_on_summary(query: str) -> bool:
         "key points", "main points", "highlights",
         "give in brief", "more concise",
     ]
-    return query_lower in short_followups or any(p in query_lower for p in short_followups)
+    return q in short_followups or any(p in q for p in short_followups)
 
 
-def extract_semester(query: str) -> str | None:
-    """Extract semester from query: 'sem 3', '3rd sem', 'semester 4'."""
+def extract_semester(query: str):
     m = SEM_PATTERN.search(query)
     if not m:
         return None
@@ -165,28 +167,25 @@ def extract_semester(query: str) -> str | None:
 
 
 def extract_lecture_numbers(query: str) -> list:
-    """Extract lecture numbers: 'lec 1', 'lecture 2 and 3'."""
     return [int(n) for n in LECTURE_NUM_PATTERN.findall(query)]
 
 
 def is_all_lectures(query: str) -> bool:
-    """Check if user wants ALL lectures."""
     return bool(ALL_PATTERN.search(query))
 
 
-def find_subject_match(query: str, available_subjects: list) -> str | None:
-    """Find which subject the user is referring to (fuzzy match)."""
-    query_lower = query.lower()
+def find_subject_match(query: str, available_subjects: list):
+    q = query.lower()
 
     # Direct match
     for subject in available_subjects:
-        if subject.lower() in query_lower:
+        if subject.lower() in q:
             return subject
 
-    # Acronym match
+    # Acronyms
     common_acronyms = {
         "dsa":    ["data structure"],
-        "dbms":   ["database management"],
+        "dbms":   ["database management", "database"],
         "os":     ["operating system"],
         "oop":    ["object oriented", "object-oriented"],
         "cn":     ["computer network"],
@@ -206,15 +205,14 @@ def find_subject_match(query: str, available_subjects: list) -> str | None:
     }
 
     for acronym, keywords in common_acronyms.items():
-        if re.search(r"\b" + acronym + r"\b", query_lower):
+        if re.search(r"\b" + acronym + r"\b", q):
             for subject in available_subjects:
                 if any(kw in subject.lower() for kw in keywords):
                     return subject
 
-    # Partial word match
-    query_words = set(re.findall(r"\b[a-z]{3,}\b", query_lower))
-    best_match  = None
-    best_score  = 0
+    # Partial word overlap
+    query_words = set(re.findall(r"\b[a-z]{3,}\b", q))
+    best_match, best_score = None, 0
     for subject in available_subjects:
         subject_words = set(re.findall(r"\b[a-z]{3,}\b", subject.lower()))
         common = query_words & subject_words
@@ -226,7 +224,6 @@ def find_subject_match(query: str, available_subjects: list) -> str | None:
 
 
 def parse_summary_request(query: str) -> dict:
-    """Parse user query and extract summary parameters."""
     return {
         "is_summary":   detect_summary_intent(query),
         "semester":     extract_semester(query),
@@ -245,9 +242,13 @@ class RAGChatbot:
         self.searcher = HybridSearcher()
         self.chat_history = []
 
-        # Remember last summary for follow-ups
+        # Remember last completed summary (for follow-ups like "give in brief")
         self.last_summary      = None
         self.last_summary_meta = None
+
+        # Remember incomplete summary request (for progressive fill-in)
+        # Structure: {semester, subject, lecture_nums, all_lectures, raw_query}
+        self.pending_summary = None
 
         print("Chatbot ready.\n")
 
@@ -255,9 +256,8 @@ class RAGChatbot:
     # LOCAL RAG RETRIEVAL
     # ─────────────────────────────────────────────
     def retrieve_context(self, query):
-        """Retrieve top-k chunks and format as context block."""
-        results = self.searcher.search(query, top_k=TOP_K, alpha=SEARCH_ALPHA)
-        results = [r for r in results if r["score"] >= MIN_SCORE]
+        results = self.searcher.search(query)
+        results = [r for r in results if r["score"] >= config.SEARCH_MIN_SCORE]
 
         if not results:
             return "", []
@@ -271,13 +271,11 @@ class RAGChatbot:
                 f"Score    : {r['score']}\n"
                 f"Content  :\n{r['text']}\n"
             )
-
         return "\n" + "-" * 50 + "\n".join(parts) + "-" * 50, results
 
     def build_messages(self, user_query, context_str):
-        """Build full message list for LLM."""
         messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-        recent = self.chat_history[-(MAX_HISTORY_TURNS * 2):]
+        recent = self.chat_history[-(config.MAX_HISTORY_TURNS * 2):]
         messages.extend(recent)
 
         user_msg = (
@@ -290,97 +288,48 @@ class RAGChatbot:
         return messages
 
     # ═════════════════════════════════════════════════
-    # WEB SEARCH (Gemini grounding)
+    # WEB / GENERAL KNOWLEDGE FALLBACKS
     # ═════════════════════════════════════════════════
-    def handle_web_search(self, user_query: str) -> tuple[str, list]:
-        """Use Gemini's built-in Google Search."""
-
-        if not ENABLE_WEB_FALLBACK:
+    def handle_web_search(self, user_query):
+        if not config.ENABLE_WEB_FALLBACK:
             return self.handle_general_knowledge(user_query)
 
-        print(f"🌐 Gemini searching Google for: {user_query}")
+        print(f"🌐 Web search: {user_query}")
 
         messages = [{"role": "system", "content": WEB_SYSTEM_PROMPT}]
-        recent = self.chat_history[-(MAX_HISTORY_TURNS * 2):]
+        recent = self.chat_history[-(config.MAX_HISTORY_TURNS * 2):]
         messages.extend(recent)
         messages.append({"role": "user", "content": user_query})
 
         result = get_answer_with_web_search(messages)
-
-        if not result["found"]:
-            return self.handle_general_knowledge(user_query)
-
-        answer  = result["answer"]
-        sources = result["sources"]
-
-        # ✅ Build numbered sources block (markdown)
-        sources_md = "\n\n---\n\n### 🔗 Sources\n\n"
-        for i, s in enumerate(sources, 1):
-            domain = s.get("domain", "link")
-            title  = s.get("title",  domain) or domain
-            url    = s["url"]
-            # Display: "1. [Title](url) — domain.com"
-            sources_md += f"{i}. [{title}]({url}) — *{domain}*\n"
-
-        # ✅ Convert sources for sidebar/sources panel
-        pseudo_sources = []
-        for i, s in enumerate(sources, 1):
-            pseudo_sources.append({
-                "source_file":    f"🌐 {s.get('title') or s.get('domain') or f'Source {i}'}",
-                "location":       s.get("domain", "Web"),
-                "score":          0.5,
-                "bm25_score":     0.0,
-                "semantic_score": 0.0,
-                "text":           f"From {s.get('domain', 'web')}",
-                "url":            s["url"],
-                "subject":        "Web",
-                "semester":       "",
-                "is_web":         True,
-            })
-
-        # ✅ Compose final answer
-        final_answer = (
-            f"> 🌐 _Not found in local docs — searched Google._\n\n"
-            f"{answer}"
-            f"{sources_md}"
-        )
-
-        return final_answer, pseudo_sources
+        answer = result.get("answer", "")
 
         final_answer = (
-            f"> 🌐 _Not found in local docs — searched Google._\n\n"
+            f"> 🌐 _Not found in local docs._\n\n"
             f"{answer}"
         )
+        return final_answer, []
 
-        return final_answer, pseudo_sources
-
-    # ═════════════════════════════════════════════════
-    # GENERAL KNOWLEDGE FALLBACK
-    # ═════════════════════════════════════════════════
-    def handle_general_knowledge(self, user_query: str) -> tuple[str, list]:
-        """Last resort: use LLM's own knowledge."""
-        print(f"🧠 General knowledge for: {user_query}")
+    def handle_general_knowledge(self, user_query):
+        print(f"🧠 General knowledge: {user_query}")
 
         messages = [{"role": "system", "content": GENERAL_KNOWLEDGE_PROMPT}]
-        recent = self.chat_history[-(MAX_HISTORY_TURNS * 2):]
+        recent = self.chat_history[-(config.MAX_HISTORY_TURNS * 2):]
         messages.extend(recent)
         messages.append({"role": "user", "content": user_query})
 
         answer = get_answer(messages)
 
         final_answer = (
-            f"> 🧠 _Not found in docs or web — answering from general knowledge._\n\n"
+            f"> 🧠 _Not found in docs — answering from general knowledge._\n\n"
             f"{answer}"
         )
-
         return final_answer, []
 
     # ═════════════════════════════════════════════════
-    # SUMMARY FOLLOW-UP HANDLER
+    # SUMMARY FOLLOW-UP (reformat last summary)
     # ═════════════════════════════════════════════════
-    def handle_summary_followup(self, query: str) -> tuple[str | None, list]:
-        """Modify or rephrase the previous summary based on user's follow-up."""
-
+    def handle_summary_followup(self, query):
         if not self.last_summary or not self.last_summary_meta:
             return None, []
 
@@ -397,13 +346,12 @@ USER'S REQUEST:
 INSTRUCTIONS:
 - Reformat the summary above according to the user's request.
 - Keep all important facts, formulae, and concepts intact.
-- If user wants "brief" or "short" → reduce to key points only (5-10 bullets).
-- If user wants "in points" or "bullets" → convert to clean bullet list.
-- If user wants "simpler" → use easier language and shorter sentences.
-- If user wants "one paragraph" → write as a single flowing paragraph.
+- If user wants "brief" or "short" → reduce to key points only.
+- If user wants "in points" → convert to clean bullet list.
+- If user wants "simpler" → use easier language.
 - If user wants "expand" or "more detail" → elaborate with examples.
-- Keep proper Markdown formatting (use ## for headings, - for bullets, **bold** for emphasis).
-- Do NOT add any apology or preamble. Just give the reformatted content directly.
+- Keep proper Markdown formatting.
+- Do NOT add any apology or preamble.
 """
 
         messages = [
@@ -418,14 +366,11 @@ INSTRUCTIONS:
             f"_Based on your previous summary, reformatted as requested._\n\n"
             f"---\n\n"
         )
-
         footer = "\n\n---\n\n## 🔗 Source Lectures\n\n"
         for link in meta["links"]:
             footer += f"- [{link['name']}]({link['url']})\n"
 
         full_response = header + new_content + footer
-
-        # Update last_summary so chained follow-ups work
         self.last_summary = new_content
 
         pseudo_sources = [
@@ -442,15 +387,17 @@ INSTRUCTIONS:
             }
             for link in meta["links"]
         ]
-
         return full_response, pseudo_sources
 
     # ═════════════════════════════════════════════════
-    # SUMMARY REQUEST HANDLER
+    # SUMMARY REQUEST (with progressive fill-in)
     # ═════════════════════════════════════════════════
-    def handle_summary_request(self, query: str) -> tuple[str, list]:
-        """Handle a new summarization request."""
-
+    def handle_summary_request(self, query, is_continuation=False):
+        """
+        Handle summarization requests.
+        If info is missing, remembers what we have and asks for the rest.
+        On continuation, merges with pending info.
+        """
         if not SUMMARIZER_AVAILABLE:
             return (
                 "❌ Summarization feature is not available. "
@@ -458,10 +405,27 @@ INSTRUCTIONS:
                 [],
             )
 
-        params = parse_summary_request(query)
+        # ── Parse the current query ──
+        current = parse_summary_request(query)
 
-        # ── 1. Determine semester ────────────────
-        sem = params["semester"]
+        # ── Merge with pending if continuing ──
+        if is_continuation and self.pending_summary:
+            merged = dict(self.pending_summary)
+            if current["semester"]:      merged["semester"]     = current["semester"]
+            if current["lecture_nums"]:  merged["lecture_nums"] = current["lecture_nums"]
+            if current["all_lectures"]:  merged["all_lectures"] = True
+            merged["raw_query"] = (self.pending_summary.get("raw_query", "") + " " + query).strip()
+        else:
+            merged = {
+                "semester":     current["semester"],
+                "lecture_nums": current["lecture_nums"],
+                "all_lectures": current["all_lectures"],
+                "subject":      None,
+                "raw_query":    query,
+            }
+
+        # ── Try to find semester from history if still missing ──
+        sem = merged["semester"]
         if not sem:
             for msg in reversed(self.chat_history):
                 if msg["role"] == "user":
@@ -470,42 +434,52 @@ INSTRUCTIONS:
                         sem = prev_sem
                         break
 
+        # ── If no semester, save and ask ──
         if not sem:
-            available = [s for s in SEM_FOLDERS.keys()]
+            self.pending_summary = merged
+            available = list(SEM_FOLDERS.keys())
             return (
                 f"📚 To summarize lectures, please specify the semester.\n\n"
                 f"**Available:** {', '.join(available)}\n\n"
-                f"**Example:** *\"Summarize Lecture 1 of DSA from sem 3\"*",
+                f"**Example:** *\"sem 3\"* or *\"of sem 4\"*",
                 [],
             )
 
-        # ── 2. Load links + get subjects ─────────
+        merged["semester"] = sem
+
+        # ── Load subjects for this sem ──
         try:
             links              = load_gdrive_links(sem)
             available_subjects = get_subjects(links)
         except FileNotFoundError as e:
+            self.pending_summary = None
             return f"❌ {str(e)}", []
 
-        # ── 3. Find subject ──────────────────────
-        subject = find_subject_match(query, available_subjects)
+        # ── Find subject ──
+        subject = merged.get("subject") or find_subject_match(merged["raw_query"], available_subjects)
 
+        # ── If no subject, save and ask ──
         if not subject:
+            self.pending_summary = merged
+            subject_list = "\n".join(f"• {s}" for s in available_subjects)
             return (
-                f"📚 I couldn't identify which subject you want to summarize in semester {sem}.\n\n"
-                f"**Available subjects:**\n"
-                + "\n".join(f"• {s}" for s in available_subjects)
-                + f"\n\n**Example:** *\"Summarize Lecture 1 of {available_subjects[0]} sem {sem}\"*",
+                f"📚 Which subject in **Semester {sem}**?\n\n"
+                f"**Available:**\n{subject_list}\n\n"
+                f"**Example:** *\"{available_subjects[0]}\"*",
                 [],
             )
 
-        # ── 4. Get lectures ──────────────────────
+        merged["subject"] = subject
+
+        # ── Get lectures for subject ──
         lectures = get_lecture_files(links, subject)
         if not lectures:
+            self.pending_summary = None
             return f"❌ No lectures found for **{subject}** in semester {sem}.", []
 
-        # ── 5. Determine which lectures ──────────
-        lecture_nums = params["lecture_nums"]
-        want_all     = params["all_lectures"]
+        # ── Determine which lectures ──
+        lecture_nums = merged["lecture_nums"]
+        want_all     = merged["all_lectures"]
 
         if want_all:
             selected = lectures
@@ -518,6 +492,7 @@ INSTRUCTIONS:
                     selected.append(match)
 
             if not selected:
+                self.pending_summary = None
                 lec_list = "\n".join(
                     f"• Lecture {i+1}: {l.get('item_name', '')}"
                     for i, l in enumerate(lectures[:10])
@@ -529,6 +504,8 @@ INSTRUCTIONS:
                 )
             mode = "single" if len(selected) == 1 else "series"
         else:
+            # No lecture specified — save and ask
+            self.pending_summary = merged
             lec_list = "\n".join(
                 f"{i+1}. {l.get('item_name', '')}"
                 for i, l in enumerate(lectures[:15])
@@ -537,12 +514,15 @@ INSTRUCTIONS:
                 f"📚 Found **{len(lectures)} lectures** in **{subject}** (Sem {sem}):\n\n"
                 f"{lec_list}\n\n"
                 f"**Tell me which one:**\n"
-                f"• *\"Summarize lecture 1 of {subject}\"*\n"
-                f"• *\"Summarize all lectures of {subject}\"*",
+                f"• *\"lecture 1\"* or *\"lec 3\"*\n"
+                f"• *\"all lectures\"* for full series",
                 [],
             )
 
-        # ── 6. Run summarization ─────────────────
+        # ✅ All info available — clear pending
+        self.pending_summary = None
+
+        # ── Run summarization ──
         try:
             if mode == "single":
                 summary, success, view_url = summarise_single_lecture(sem, selected[0])
@@ -558,7 +538,6 @@ INSTRUCTIONS:
             if not success:
                 return f"❌ Could not generate summary:\n\n{summary}", []
 
-            # Store for follow-up requests
             self.last_summary      = summary
             self.last_summary_meta = {
                 "sem":     sem,
@@ -571,7 +550,6 @@ INSTRUCTIONS:
                 f"# 📝 Summary: {subject} (Sem {sem})\n\n"
                 f"**Mode:** {'Single Lecture' if mode == 'single' else f'Series of {len(selected)} Lectures'}\n\n"
             )
-
             footer = "\n\n---\n\n## 🔗 Source Lectures\n\n"
             for link in lecture_links:
                 footer += f"- [{link['name']}]({link['url']})\n"
@@ -592,15 +570,15 @@ INSTRUCTIONS:
                 }
                 for link in lecture_links
             ]
-
             return full_response, pseudo_sources
 
         except Exception as e:
             import traceback
             traceback.print_exc()
+            self.pending_summary = None
             return f"❌ Error: {str(e)}", []
 
-    def _find_lecture_by_number(self, lectures: list, num: int) -> dict | None:
+    def _find_lecture_by_number(self, lectures, num):
         """Find a lecture matching a given number."""
         patterns = [
             rf"\b(?:lec(?:ture)?|lesson|chapter|ch)\s*[-_#]?\s*0?{num}\b",
@@ -616,22 +594,29 @@ INSTRUCTIONS:
         return None
 
     # ═════════════════════════════════════════════════
-    # MAIN CHAT METHOD — ROUTING
+    # MAIN CHAT ROUTER
     # ═════════════════════════════════════════════════
     def chat(self, user_query):
         """
         Routing order:
-          1. Summary follow-up   → reformat last summary
-          2. New summary request → fetch & summarize
-          3. Local RAG search    → answer from docs
-          4. Web search fallback → Gemini's Google Search
-          5. General knowledge   → LLM only (last resort)
+          1. Continue pending summary (clarification response)
+          2. Follow-up on last summary (reformat)
+          3. New summary request
+          4. Local RAG search
+          5. Web/general knowledge fallback
         """
         user_query = user_query.strip()
         if not user_query:
             return "Please ask a question.", []
 
-        # ── 1. Summary follow-up ──
+        # ── 1. Continue pending summary ──
+        if self.pending_summary and is_clarification_response(user_query):
+            print(f"🔗 Continuing pending summary: {user_query}")
+            answer, sources = self.handle_summary_request(user_query, is_continuation=True)
+            self._save_history(user_query, answer)
+            return answer, sources
+
+        # ── 2. Follow-up on completed summary ──
         if self.last_summary and is_followup_on_summary(user_query):
             print(f"🔄 Summary follow-up: {user_query}")
             answer, sources = self.handle_summary_followup(user_query)
@@ -639,26 +624,27 @@ INSTRUCTIONS:
                 self._save_history(user_query, answer)
                 return answer, sources
 
-        # ── 2. New summary request ──
+        # ── 3. New summary request ──
         if detect_summary_intent(user_query):
             print(f"🎯 Summary request: {user_query}")
+            # Clear any old pending state (fresh request)
+            self.pending_summary = None
             answer, sources = self.handle_summary_request(user_query)
             self._save_history(user_query, answer)
             return answer, sources
 
-        # ── 3. Local RAG search ──
+        # ── 4. Local RAG search ──
         print(f"🔍 Local search: {user_query}")
         context_str, sources = self.retrieve_context(user_query)
 
         best_score     = max((r["score"] for r in sources), default=0)
-        has_good_local = context_str and best_score >= WEB_FALLBACK_SCORE
+        has_good_local = context_str and best_score >= config.WEB_FALLBACK_SCORE
 
         if has_good_local:
             print(f"   ✅ Good local results (best: {best_score:.2f})")
             messages = self.build_messages(user_query, context_str)
-            answer   = get_answer(messages)
+            answer = get_answer(messages)
 
-            # If LLM says "not found" → trigger web fallback
             not_found_signals = [
                 "could not find",
                 "not find relevant",
@@ -669,13 +655,13 @@ INSTRUCTIONS:
                 "do not contain",
             ]
             if any(sig in answer.lower() for sig in not_found_signals):
-                print(f"   ⚠️  LLM said 'not found' → web fallback")
+                print(f"   ⚠️  LLM said 'not found' → fallback")
                 answer, sources = self.handle_web_search(user_query)
         else:
             if best_score > 0:
-                print(f"   ⚠️  Weak local results ({best_score:.2f}) → web")
+                print(f"   ⚠️  Weak local ({best_score:.2f}) → fallback")
             else:
-                print(f"   ⚠️  No local results → web")
+                print(f"   ⚠️  No local results → fallback")
             answer, sources = self.handle_web_search(user_query)
 
         self._save_history(user_query, answer)
@@ -684,14 +670,14 @@ INSTRUCTIONS:
     # ─────────────────────────────────────────────
     # HELPERS
     # ─────────────────────────────────────────────
-    def _save_history(self, user_query: str, answer: str):
-        """Save user + bot turn to history."""
+    def _save_history(self, user_query, answer):
         self.chat_history.append({"role": "user",      "content": user_query})
         self.chat_history.append({"role": "assistant", "content": answer})
 
     def reset_history(self):
-        """Clear all chat history including summary memory."""
+        """Clear ALL state including pending and last summary."""
         self.chat_history      = []
         self.last_summary      = None
         self.last_summary_meta = None
+        self.pending_summary   = None
         print("Conversation history cleared.\n")

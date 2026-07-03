@@ -9,8 +9,10 @@ import re
 import numpy as np
 import faiss
 from rank_bm25 import BM25Okapi
+import torch
 from sentence_transformers import SentenceTransformer
 
+import llm_config as config
 # ─────────────────────────────────────────────
 # Path parsing helper
 # ─────────────────────────────────────────────
@@ -197,53 +199,91 @@ def chunk_records(records: list[dict], max_words: int = 200, overlap: int = 40) 
     print(f"✅ Created {len(chunked)} chunks with full metadata")
     return chunked
 
-# =================Index_Building===================
+# ─────────────────────────────────────────────
+# Paths
+# ─────────────────────────────────────────────
+CURRENT_DIR  = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
+INDEX_DIR    = os.path.join(PROJECT_ROOT, "index_store")
 
-INDEX_DIR = "index_store"
-EMBED_MODEL = "all-MiniLM-L6-v2"   # small, fast, good quality
+
+# ─────────────────────────────────────────────
+# Lazy model loader
+# ─────────────────────────────────────────────
+_embed_model = None
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"🖥️  Using device: {DEVICE.upper()}")
+if DEVICE == "cuda":
+    print(f"   GPU: {torch.cuda.get_device_name(0)}")
 
 
-def tokenize(text):
-    """Simple tokenizer for BM25."""
+def get_embed_model():
+    global _embed_model
+    if _embed_model is None:
+        print(f"📥 Loading embedding model: {config.EMBED_MODEL}")
+        _embed_model = SentenceTransformer(config.EMBED_MODEL, device=DEVICE)
+        print(f"✅ Embedding model loaded (dim={_embed_model.get_embedding_dimension()})")
+    return _embed_model
+
+
+# ─────────────────────────────────────────────
+# Tokenizer for BM25
+# ─────────────────────────────────────────────
+def tokenize(text: str) -> list:
     return re.findall(r"[a-z0-9]+", text.lower())
 
 
-def build_indexes(chunks):
+# ─────────────────────────────────────────────
+# Build indexes
+# ─────────────────────────────────────────────
+def build_indexes(chunks: list):
     os.makedirs(INDEX_DIR, exist_ok=True)
-
     texts = [c["text"] for c in chunks]
 
-    # ---------- 1. BM25 (keyword) index ----------
-    print("Building BM25 index...")
+    # BM25
+    print("\n🔨 Building BM25 index...")
     tokenized = [tokenize(t) for t in texts]
     bm25 = BM25Okapi(tokenized)
-
     with open(os.path.join(INDEX_DIR, "bm25.pkl"), "wb") as f:
         pickle.dump({"bm25": bm25, "tokenized": tokenized}, f)
+    print(f"✅ BM25 index built ({len(tokenized)} docs)")
 
-    # ---------- 2. Vector (semantic) index ----------
-    print("Building vector index (this may take a while)...")
-    model = SentenceTransformer(EMBED_MODEL)
+    # Vector (BGE-M3 on GPU)
+    print(f"\n🔨 Building vector index with {config.EMBED_MODEL} on {DEVICE.upper()}...")
+    model = get_embed_model()
+
+    # On GPU can use larger batch size
+    batch_size = 64 if DEVICE == "cuda" else config.EMBED_BATCH_SIZE
+
     embeddings = model.encode(
         texts,
-        batch_size=64,
-        show_progress_bar=True,
-        convert_to_numpy=True,
-        normalize_embeddings=True,   # so inner product == cosine similarity
+        batch_size            = batch_size,
+        show_progress_bar     = True,
+        convert_to_numpy      = True,
+        normalize_embeddings  = config.EMBED_NORMALIZE,
     )
 
     dim = embeddings.shape[1]
-    index = faiss.IndexFlatIP(dim)   # inner product on normalized vectors
+    index = faiss.IndexFlatIP(dim)
     index.add(embeddings.astype(np.float32))
-
     faiss.write_index(index, os.path.join(INDEX_DIR, "faiss.index"))
+    print(f"✅ FAISS index built (dim={dim})")
 
-    # ---------- 3. Save chunk metadata ----------
+    # Save chunks
     with open(os.path.join(INDEX_DIR, "chunks.json"), "w", encoding="utf-8") as f:
         json.dump(chunks, f, ensure_ascii=False)
 
-    print("Indexes saved to", INDEX_DIR)
-    
+    # Save config
+    idx_config = {
+        "embed_model": config.EMBED_MODEL,
+        "embed_dim":   dim,
+        "num_chunks":  len(chunks),
+        "device":      DEVICE,
+    }
+    with open(os.path.join(INDEX_DIR, "config.json"), "w", encoding="utf-8") as f:
+        json.dump(idx_config, f, indent=2)
+
+    print(f"\n✅ All indexes saved to {INDEX_DIR}") 
     
 # =================Main function to run the whole pipeline===================
 
