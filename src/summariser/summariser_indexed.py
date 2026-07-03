@@ -146,22 +146,35 @@ def get_subjects(links: list) -> list:
 
 
 def get_lecture_files(links: list, subject: str) -> list:
-    """Get lecture files for a subject, naturally sorted."""
     lectures = [
         link for link in links
         if link["subject"] == subject
         and link["category"] == "Lectures"
         and not link.get("is_folder", False)
     ]
-
-    def natural_sort_key(item):
-        name = item.get("item_name", "")
-        numbers = re.findall(r"\d+", name)
-        first_num = int(numbers[0]) if numbers else 999
-        return (first_num, name.lower())
-
-    lectures.sort(key=natural_sort_key)
+    lectures.sort(key=lambda l: natural_sort_key(l.get("item_name", "")))
     return lectures
+
+
+def natural_sort_key(text: str) -> tuple:
+    import re
+
+    text_lower = str(text).lower().strip()
+
+    patterns = [
+        r"^(?:lecture|lec|chapter|ch|lesson)[\s\-_]*(\d+)",
+        r"^l[\s\-_]*(\d+)",
+        r"^(\d+)",
+    ]
+
+    for pattern in patterns:
+        m = re.match(pattern, text_lower)
+        if m:
+            num = int(m.group(1))
+            remaining = text_lower[m.end():].strip()
+            return (0, num, remaining)
+
+    return (1, 0, text_lower)
 
 
 # ─────────────────────────────────────────────

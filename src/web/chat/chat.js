@@ -182,7 +182,44 @@
                     `;
 
             // Sort files alphabetically
-            files.sort((a, b) => a.name.localeCompare(b.name));
+            // Natural sort comparator: "L2" before "L10"
+            // Smart lecture sort — handles L1, L-1, Lec 1, Lecture 1, Chapter 1, etc.
+            function naturalCompare(a, b) {
+              const keyA = getLectureSortKey(a);
+              const keyB = getLectureSortKey(b);
+
+              // Compare tuple: [hasNumber, number, remaining]
+              if (keyA[0] !== keyB[0]) return keyA[0] - keyB[0];
+              if (keyA[1] !== keyB[1]) return keyA[1] - keyB[1];
+              return keyA[2].localeCompare(keyB[2]);
+            }
+
+            function getLectureSortKey(text) {
+              const s = String(text).toLowerCase().trim();
+
+              // Try patterns in order
+              const patterns = [
+                // "lecture 15", "lecture-15", "lec 8", "lec-11", "chapter 3"
+                /^(?:lecture|lec|chapter|ch|lesson)[\s\-_]*(\d+)/,
+                // "l 9", "l-10", "l11", "l_2"
+                /^l[\s\-_]*(\d+)/,
+                // Fallback: leading number
+                /^(\d+)/,
+              ];
+
+              for (const pattern of patterns) {
+                const m = s.match(pattern);
+                if (m) {
+                  const num = parseInt(m[1], 10);
+                  const remaining = s.substring(m[0].length).trim();
+                  return [0, num, remaining]; // 0 = has number, sorts first
+                }
+              }
+
+              // No number found — sort alphabetically at the end
+              return [1, 0, s]; // 1 = no number, sorts last
+            }
+            files.sort((a, b) => naturalCompare(a.name, b.name));
             files.forEach((file) => {
               const fileIcon = getFileIcon(file.name);
               if (file.url) {
@@ -397,25 +434,25 @@
 
   function renderSource(s, i) {
     const fname = escapeHtml(s.source_file);
-    const loc   = escapeHtml(s.location);
-    const text  = escapeHtml((s.text || '').substring(0, 200));
-    const url   = s.url || '';
+    const loc = escapeHtml(s.location);
+    const text = escapeHtml((s.text || "").substring(0, 200));
+    const url = s.url || "";
     const isWeb = s.is_web === true;
 
     const fileLabel = url
-        ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener">${fname} 🔗</a>`
-        : fname;
+      ? `<a href="${escapeAttr(url)}" target="_blank" rel="noopener">${fname} 🔗</a>`
+      : fname;
 
     const metaParts = [];
-    if (s.branch)   metaParts.push(`🎓 ${escapeHtml(s.branch)}`);
+    if (s.branch) metaParts.push(`🎓 ${escapeHtml(s.branch)}`);
     if (s.semester) metaParts.push(`📅 Sem ${escapeHtml(s.semester)}`);
-    if (s.subject)  metaParts.push(`📚 ${escapeHtml(s.subject)}`);
+    if (s.subject) metaParts.push(`📚 ${escapeHtml(s.subject)}`);
     const meta = metaParts.length
-        ? `<div class="source-item-meta">${metaParts.join(' · ')}</div>`
-        : '';
+      ? `<div class="source-item-meta">${metaParts.join(" · ")}</div>`
+      : "";
 
     return `
-        <div class="source-item ${isWeb ? 'web-source' : ''}">
+        <div class="source-item ${isWeb ? "web-source" : ""}">
             <div class="source-item-header">
                 <span>${i + 1}. ${fileLabel} · ${loc}</span>
                 <span class="source-item-score">Score: ${s.score.toFixed(2)}</span>
@@ -424,7 +461,7 @@
             <div class="source-item-text">"${text}…"</div>
         </div>
     `;
-}
+  }
 
   function addBotMessage(answer, sources = []) {
     const el = document.createElement("div");

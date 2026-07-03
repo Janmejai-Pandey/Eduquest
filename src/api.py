@@ -219,14 +219,12 @@ def reset_chat(session_id: str = "default"):
 
 @app.get("/stats")
 def get_stats():
-    """Build tree using chunk metadata (works for all branches/sems)."""
     try:
         with open("index_store/chunks.json", encoding="utf-8") as f:
             chunks = json.load(f)
 
-        # ✅ Use chunk metadata directly
         tree = {}
-        seen_files_per_group = {}   # dedupe
+        seen_files_per_group = {}
 
         for chunk in chunks:
             branch   = chunk.get("branch",   "") or "Unknown"
@@ -243,14 +241,11 @@ def get_stats():
                 seen_files_per_group[group_key] = set()
 
             if fname in seen_files_per_group[group_key]:
-                continue   # already added
+                continue
             seen_files_per_group[group_key].add(fname)
 
-            # Get URL from FILE_LINKS
             url_key = f"{branch}|{sem}|{subject}|{fname}"
-            url = ""
-            if url_key in FILE_LINKS:
-                url = FILE_LINKS[url_key].get("url", "")
+            url = FILE_LINKS.get(url_key, {}).get("url", "")
 
             tree.setdefault(branch, {}) \
                 .setdefault(sem, {}) \
@@ -261,10 +256,16 @@ def get_stats():
                     "url":  url,
                 })
 
-        # Count total unique files
-        all_files = set()
-        for chunk in chunks:
-            all_files.add(chunk.get("source_file", ""))
+        # ✅ NATURAL SORT files in each category
+        for branch in tree:
+            for sem in tree[branch]:
+                for subject in tree[branch][sem]:
+                    for category in tree[branch][sem][subject]:
+                        tree[branch][sem][subject][category].sort(
+                            key=lambda f: natural_sort_key(f["name"])
+                        )
+
+        all_files = set(chunk.get("source_file", "") for chunk in chunks)
 
         return {
             "total_files":  len(all_files),
@@ -274,8 +275,7 @@ def get_stats():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        raise HTTPException(status_code=500, detail=str(e))    
        
 def normalize_category(cat: str) -> str:
     """Normalize various category names to consistent labels."""
@@ -304,6 +304,30 @@ def normalize_category(cat: str) -> str:
 
     # Capitalize first letter as fallback
     return cat.strip().title() or "Other"
+
+def natural_sort_key(text: str) -> tuple:
+    """
+    Smart sort: extracts lecture number from various naming patterns.
+    Handles: L1, L-1, Lec 1, Lecture 1, Chapter 1, etc.
+    """
+    import re
+
+    text_lower = str(text).lower().strip()
+
+    patterns = [
+        r"^(?:lecture|lec|chapter|ch|lesson)[\s\-_]*(\d+)",
+        r"^l[\s\-_]*(\d+)",
+        r"^(\d+)",
+    ]
+
+    for pattern in patterns:
+        m = re.match(pattern, text_lower)
+        if m:
+            num = int(m.group(1))
+            remaining = text_lower[m.end():].strip()
+            return (0, num, remaining)
+
+    return (1, 0, text_lower)
 
 
 # ════════════════════════════════════════════════════════
@@ -432,6 +456,7 @@ def debug_duplicates():
 
 from quiz.quiz_web import (
     get_browse_tree     as quiz_browse_tree,
+    list_files          as quiz_list_files,
     generate_quiz_indexed,
     save_quiz_indexed,
     score_quiz          as quiz_score_answers,
@@ -443,6 +468,7 @@ class QuizIndexedRequest(BaseModel):
     sem:            str | None       = None
     subject:        str | None       = None
     category:       str | None       = None
+    file_names:     list[str] | None = None
     question_types: list[str] | None = None
     difficulty:     str              = "Medium"
     num_questions:  int | None       = None
@@ -452,6 +478,25 @@ class QuizIndexedRequest(BaseModel):
 class QuizScoreRequest(BaseModel):
     questions:    list[dict]
     user_answers: list
+
+@app.get("/quiz/files")
+def quiz_files_endpoint(
+    branch:   str | None = None,
+    sem:      str | None = None,
+    subject:  str | None = None,
+    category: str | None = None,
+):
+    """List files matching the given filters."""
+    try:
+        files = quiz_list_files(
+            branch   = branch,
+            sem      = sem,
+            subject  = subject,
+            category = category,
+        )
+        return {"files": files, "count": len(files)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.get("/quiz/browse")
@@ -470,6 +515,7 @@ def quiz_generate_endpoint(req: QuizIndexedRequest):
             sem            = req.sem,
             subject        = req.subject,
             category       = req.category,
+            file_names     = req.file_names,           # ← NEW
             question_types = req.question_types or ["MCQ", "True/False", "Short Answer"],
             difficulty     = req.difficulty,
             num_questions  = req.num_questions,

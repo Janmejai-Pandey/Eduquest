@@ -313,24 +313,42 @@ def extract_correct_letter(answer_text: str) -> Optional[str]:
 # MAIN: Generate quiz
 # ─────────────────────────────────────────────
 def generate_quiz_indexed(
-    branch:         Optional[str]       = None,
-    sem:            Optional[str]       = None,
-    subject:        Optional[str]       = None,
-    category:       Optional[str]       = None,
-    question_types: Optional[list[str]] = None,
-    difficulty:     str                 = "Medium",
-    num_questions:  Optional[int]       = None,
+    branch:         str  = None,
+    sem:            str  = None,
+    subject:        str  = None,
+    category:       str  = None,
+    file_names:     list = None,   # ← NEW: specific file selection
+    question_types: list = None,
+    difficulty:     str  = "Medium",
+    num_questions:  int  = None,
 ) -> dict:
     if question_types is None:
         question_types = ["MCQ", "True/False", "Short Answer"]
 
-    chunks = filter_chunks(branch, sem, subject, category)
+    # ── Pick chunks: by files OR by filters ──
+    if file_names:
+        chunks = filter_chunks_by_files(
+            file_names = file_names,
+            branch     = branch,
+            sem        = sem,
+            subject    = subject,
+        )
+        source_label = f"{len(file_names)} selected file(s)"
+    else:
+        chunks = filter_chunks(branch, sem, subject, category)
+        source_label = "all matching files"
 
     if not chunks:
         return {
             "success": False,
-            "error":   f"No content found (branch={branch}, sem={sem}, subject={subject}, category={category})",
-            "filters": {"branch": branch, "sem": sem, "subject": subject, "category": category},
+            "error":   f"No content found for {source_label}",
+            "filters": {
+                "branch":     branch,
+                "sem":        sem,
+                "subject":    subject,
+                "category":   category,
+                "file_names": file_names,
+            },
         }
 
     selected = sample_content(chunks, num_chunks=10)
@@ -360,8 +378,11 @@ def generate_quiz_indexed(
         num_questions = auto_num_questions(content)
     num_questions = max(3, min(num_questions, 30))
 
+    # Build label
     label_parts = [p for p in [branch, sem and f"Sem {sem}", subject, category] if p]
     label = " / ".join(label_parts) or "General"
+    if file_names:
+        label += f" ({len(file_names)} file{'s' if len(file_names) > 1 else ''})"
 
     system_prompt = build_quiz_prompt(question_types, difficulty, num_questions)
     user_msg = f"Source: {label}\n\nContent:\n{content}"
@@ -394,20 +415,132 @@ def generate_quiz_indexed(
         "question_types": question_types,
         "label":          label,
         "filters": {
-            "branch":   branch,
-            "sem":      sem,
-            "subject":  subject,
-            "category": category,
+            "branch":     branch,
+            "sem":        sem,
+            "subject":    subject,
+            "category":   category,
+            "file_names": file_names,
         },
         "sources": list(source_files.values()),
     }
 
 
 # ─────────────────────────────────────────────
-# Score user answers
+# Smart answer comparison helpers
 # ─────────────────────────────────────────────
-def score_quiz(questions: list[dict], user_answers: list) -> dict:
-    """Score user's answers. Returns per-question feedback + overall stats."""
+def parse_numeric(text: str):
+    """
+    Try to extract a numeric value from text.
+    Handles: "0.533", "8/15", "1/2", "-3.14", "2.5e-3", "42", "1,234.5"
+    Returns float or None if not numeric.
+    """
+    import re
+    if text is None:
+        return None
+
+    s = str(text).strip()
+    if not s:
+        return None
+
+    # Remove common units and words (keep only math-relevant chars)
+    # But save the original for fraction detection
+    s_clean = s.replace(",", "").strip()
+
+    # Try fraction first: "8/15", "-1/2"
+    frac_match = re.match(r"^\s*(-?\d+\.?\d*)\s*/\s*(-?\d+\.?\d*)\s*$", s_clean)
+    if frac_match:
+        try:
+            num = float(frac_match.group(1))
+            den = float(frac_match.group(2))
+            if den != 0:
+                return num / den
+        except (ValueError, ZeroDivisionError):
+            pass
+
+    # Try mixed number: "1 3/4"
+    mixed = re.match(r"^\s*(-?\d+)\s+(\d+)\s*/\s*(\d+)\s*$", s_clean)
+    if mixed:
+        try:
+            whole = float(mixed.group(1))
+            num = float(mixed.group(2))
+            den = float(mixed.group(3))
+            if den != 0:
+                sign = -1 if whole < 0 else 1
+                return whole + sign * (num / den)
+        except (ValueError, ZeroDivisionError):
+            pass
+
+    # Try to extract first number from text (handles "42 m/s" → 42)
+    num_match = re.search(r"-?\d+\.?\d*(?:[eE][-+]?\d+)?", s_clean)
+    if num_match:
+        try:
+            return float(num_match.group(0))
+        except ValueError:
+            pass
+
+    return None
+
+
+def compare_numeric(user_ans, correct_ans, tolerance: float = 0.01) -> bool:
+    """
+    Compare two answers numerically with tolerance.
+    - Handles fractions (8/15), decimals (0.533), integers (42)
+    - Uses relative tolerance for large numbers, absolute for small
+    Returns True if within tolerance, else False.
+    Returns None if either can't be parsed as number.
+    """
+    u_num = parse_numeric(user_ans)
+    c_num = parse_numeric(correct_ans)
+
+    if u_num is None or c_num is None:
+        return None   # Not numeric — caller should fall back to text compare
+
+    # For very small numbers, use absolute tolerance
+    if abs(c_num) < 1:
+        return abs(u_num - c_num) < tolerance
+
+    # For larger numbers, use relative tolerance
+    return abs(u_num - c_num) / abs(c_num) < tolerance
+
+
+def compare_text(user_ans, correct_ans) -> bool:
+    """
+    Compare two text answers (case-insensitive, punctuation-agnostic).
+    """
+    import re
+    u = re.sub(r"[^\w\s]", "", str(user_ans or "")).lower().strip()
+    c = re.sub(r"[^\w\s]", "", str(correct_ans or "")).lower().strip()
+
+    if not u or not c:
+        return False
+
+    # Normalize whitespace
+    u = re.sub(r"\s+", " ", u)
+    c = re.sub(r"\s+", " ", c)
+
+    return u == c or u in c or c in u
+
+
+def smart_compare(user_ans, correct_ans) -> bool:
+    """
+    Try numeric comparison first; fall back to text.
+    """
+    # Try numeric
+    num_result = compare_numeric(user_ans, correct_ans)
+    if num_result is not None:
+        return num_result
+
+    # Fall back to text
+    return compare_text(user_ans, correct_ans)
+
+
+# ─────────────────────────────────────────────
+# Updated score_quiz
+# ─────────────────────────────────────────────
+def score_quiz(questions: list, user_answers: list) -> dict:
+    """Score user's answers with smart numeric + text comparison."""
+    import re
+
     results       = []
     auto_correct  = 0
     auto_total    = 0
@@ -436,27 +569,28 @@ def score_quiz(questions: list[dict], user_answers: list) -> dict:
             result["correct_letter"] = correct_letter
             if is_correct:
                 auto_correct += 1
+
         elif qtype == "True/False":
             auto_total += 1
-            c = correct_ans.lower().strip()
+            c = str(correct_ans).lower().strip()
             u = str(user_ans or "").lower().strip()
             is_correct = (
-                (u in ["true",  "t"] and "true"  in c) or
-                (u in ["false", "f"] and "false" in c)
+                (u in ["true",  "t", "yes", "y"] and "true"  in c) or
+                (u in ["false", "f", "no",  "n"] and "false" in c)
             )
             result["is_correct"] = bool(is_correct)
             if is_correct:
                 auto_correct += 1
-        elif qtype == "Fill in the Blanks":
+
+        elif qtype in ("Fill in the Blanks", "Numerical"):
             auto_total += 1
-            u = re.sub(r"[^\w\s]", "", str(user_ans or "")).lower().strip()
-            c = re.sub(r"[^\w\s]", "", correct_ans).lower().strip()
-            is_correct = u and (u == c or u in c or c in u)
+            is_correct = smart_compare(user_ans, correct_ans)
             result["is_correct"] = bool(is_correct)
             if is_correct:
                 auto_correct += 1
+
         else:
-            # Short/Long/Numerical — manual review
+            # Short/Long Answer — needs manual review
             result["is_correct"]   = None
             result["needs_review"] = True
             manual_review += 1
@@ -482,7 +616,6 @@ def score_quiz(questions: list[dict], user_answers: list) -> dict:
         "tier":            tier,
         "total_questions": len(questions),
     }
-
 
 # ─────────────────────────────────────────────
 # Save quiz
@@ -527,3 +660,145 @@ def save_quiz_indexed(quiz_result: dict) -> str:
         f.write(quiz_text)
 
     return filepath
+
+# ─────────────────────────────────────────────
+# List available files (for user selection)
+# ─────────────────────────────────────────────
+def list_files(
+    branch:   str = None,
+    sem:      str = None,
+    subject:  str = None,
+    category: str = None,
+) -> list:
+    """List unique files matching filters, naturally sorted."""
+    chunks  = load_chunks()
+    url_map = load_url_map()
+
+    seen  = set()
+    files = []
+
+    for chunk in chunks:
+        if branch   and chunk.get("branch",   "") != branch:   continue
+        if sem      and chunk.get("semester", "") != sem:      continue
+        if subject  and chunk.get("subject",  "") != subject:  continue
+        if category and chunk.get("category", "") != category: continue
+
+        fname = chunk.get("source_file", "")
+        if not fname:
+            continue
+
+        key = (
+            chunk.get("branch",   ""),
+            chunk.get("semester", ""),
+            chunk.get("subject",  ""),
+            fname,
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+
+        url_key = f"{key[0]}|{key[1]}|{key[2]}|{fname}"
+        files.append({
+            "name":     fname,
+            "branch":   chunk.get("branch", ""),
+            "semester": chunk.get("semester", ""),
+            "subject":  chunk.get("subject", ""),
+            "category": chunk.get("category", ""),
+            "url":      url_map.get(url_key, ""),
+            "chunk_count": 0,
+        })
+
+    # Count chunks per file
+    for f in files:
+        count = 0
+        for chunk in chunks:
+            if (chunk.get("source_file") == f["name"] and
+                chunk.get("branch",   "") == f["branch"] and
+                chunk.get("semester", "") == f["semester"] and
+                chunk.get("subject",  "") == f["subject"]):
+                count += 1
+        f["chunk_count"] = count
+
+    # ✅ NATURAL SORT — treats "L2" before "L10"
+    files.sort(key=lambda f: natural_sort_key(f["name"]))
+    return files
+
+
+# ─────────────────────────────────────────────
+# Natural sort helper
+# ─────────────────────────────────────────────
+def natural_sort_key(text: str) -> tuple:
+    """
+    Smart sort key that handles ALL these formats:
+      - "L1", "L 1", "L-1", "L_1"
+      - "Lec 1", "Lec-1", "Lec_1"
+      - "Lecture 1", "Lecture-1", "Lecture_1"
+      - "Ch 1", "Chapter 1"
+
+    Returns (lecture_num, remaining_text) so numbers sort numerically
+    and files without lecture numbers sort at the end alphabetically.
+    """
+    import re
+
+    text_lower = str(text).lower().strip()
+
+    # Try to extract lecture number using multiple patterns
+    patterns = [
+        # "lecture 15", "lecture-15", "lec 8", "lec-11", "chapter 3"
+        r"^(?:lecture|lec|chapter|ch|lesson)[\s\-_]*(\d+)",
+        # "l 9", "l-10", "l11", "l_2"
+        r"^l[\s\-_]*(\d+)",
+        # Fallback: any leading number
+        r"^(\d+)",
+    ]
+
+    for pattern in patterns:
+        m = re.match(pattern, text_lower)
+        if m:
+            num = int(m.group(1))
+            # Remove the matched prefix to get the rest for tiebreaker
+            remaining = text_lower[m.end():].strip()
+            return (0, num, remaining)   # 0 = has number, sorts first
+
+    # No lecture number found — sort alphabetically at the end
+    return (1, 0, text_lower)   # 1 = no number, sorts last
+
+
+# ─────────────────────────────────────────────
+# Filter chunks by specific files
+# ─────────────────────────────────────────────
+def filter_chunks_by_files(
+    file_names: list,
+    branch:     str = None,
+    sem:        str = None,
+    subject:    str = None,
+) -> list:
+    """
+    Get chunks for a specific list of file names.
+    Uses branch/sem/subject to disambiguate duplicate filenames.
+    """
+    if not file_names:
+        return []
+
+    chunks  = load_chunks()
+    url_map = load_url_map()
+
+    file_set = set(file_names)
+    filtered = []
+
+    for chunk in chunks:
+        fname = chunk.get("source_file", "")
+        if fname not in file_set:
+            continue
+
+        if branch   and chunk.get("branch",   "") != branch:   continue
+        if sem      and chunk.get("semester", "") != sem:      continue
+        if subject  and chunk.get("subject",  "") != subject:  continue
+
+        # Attach URL
+        key = f"{chunk.get('branch', '')}|{chunk.get('semester', '')}|{chunk.get('subject', '')}|{fname}"
+        chunk_copy = dict(chunk)
+        chunk_copy["url"] = url_map.get(key, "")
+        filtered.append(chunk_copy)
+
+    return filtered

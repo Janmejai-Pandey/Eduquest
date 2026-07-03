@@ -77,6 +77,23 @@
                     </div>
                 </div>
 
+                <!-- ✅ NEW: File selection section -->
+                <div class="form-group">
+                    <div class="file-select-header">
+                        <label>📄 Select Files <span id="fileCountBadge" class="badge">0</span></label>
+                        <div class="file-select-actions">
+                            <button type="button" class="mini-btn" id="selectAllFiles">✓ All</button>
+                            <button type="button" class="mini-btn" id="selectNoneFiles">✗ None</button>
+                        </div>
+                    </div>
+                    <div class="file-select-hint" id="fileSelectHint">
+                        💡 Choose filters above to see available files, then pick specific ones for your quiz.
+                    </div>
+                    <div class="file-select-list" id="fileSelectList">
+                        <div class="file-empty">No files loaded yet — pick filters above</div>
+                    </div>
+                </div>
+
                 <div class="form-group">
                     <label>📝 Question Types (pick one or more)</label>
                     <div class="type-grid">
