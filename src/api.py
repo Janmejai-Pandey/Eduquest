@@ -361,19 +361,18 @@ async def analyze_resume_endpoint(
     file:       UploadFile = File(...),
     name:       str        = Form(...),
     enrollment: str        = Form(...),
-    semester:   str        = Form(...),
+    year:       str        = Form(...),
     branch:     str        = Form(...),
     job_role:   str        = Form(...),
 ):
-    """Analyze uploaded resume with sem/branch/enrollment tracking."""
+    """Analyze uploaded resume with year/branch/enrollment tracking."""
     try:
-        # Validation
         if not name.strip():
             raise HTTPException(status_code=400, detail="Name is required")
         if not enrollment.strip():
             raise HTTPException(status_code=400, detail="Enrollment is required")
-        if semester not in ("3", "4"):
-            raise HTTPException(status_code=400, detail="Semester must be 3 or 4")
+        if year not in ("1", "2", "3", "4", "5"):
+            raise HTTPException(status_code=400, detail="Year must be 1-5")
         if not branch.strip():
             raise HTTPException(status_code=400, detail="Branch is required")
 
@@ -395,7 +394,7 @@ async def analyze_resume_endpoint(
             file_bytes = file_bytes,
             user_name  = name.strip(),
             enrollment = enrollment.strip(),
-            semester   = semester,
+            year       = year,
             branch     = branch.strip(),
             job_role   = job_role.strip(),
         )
@@ -408,8 +407,7 @@ async def analyze_resume_endpoint(
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))
-    
+        raise HTTPException(status_code=500, detail=str(e))   
 
 @app.get("/debug/duplicates")
 def debug_duplicates():

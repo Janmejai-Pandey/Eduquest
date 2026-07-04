@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   RESUME RANKING — With sem + enrollment + branch tracking
+   RESUME RANKING — With Year + enrollment + branch tracking
    ════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -10,7 +10,7 @@
     // DOM
     const userName        = document.getElementById('userName');
     const enrollmentInput = document.getElementById('enrollment');
-    const semSelect       = document.getElementById('semSelect');
+    const yearSelect       = document.getElementById('yearSelect');
     const branchSelect    = document.getElementById('branchSelect');
     const roleSelect      = document.getElementById('roleSelect');
     const roleSkillsHint  = document.getElementById('roleSkillsHint');
@@ -190,7 +190,7 @@
     // ════════════════════════════════════════
     // 3. FORM VALIDATION
     // ════════════════════════════════════════
-    [userName, enrollmentInput, semSelect, branchSelect, roleSelect].forEach(el => {
+    [userName, enrollmentInput, yearSelect, branchSelect, roleSelect].forEach(el => {
         el.addEventListener('input',  checkFormValid);
         el.addEventListener('change', checkFormValid);
     });
@@ -199,7 +199,7 @@
         analyzeBtn.disabled = !(
             userName.value.trim() &&
             enrollmentInput.value.trim().length >= 4 &&
-            semSelect.value &&
+            yearSelect.value &&
             branchSelect.value &&
             roleSelect.value &&
             selectedFile
@@ -221,7 +221,7 @@
             formData.append('file',       selectedFile);
             formData.append('name',       userName.value.trim());
             formData.append('enrollment', enrollmentInput.value.trim().toUpperCase());
-            formData.append('semester',   semSelect.value);
+            formData.append('year',   yearSelect.value);
             formData.append('branch',     branchSelect.value);
             formData.append('job_role',   roleSelect.value);
 
@@ -309,7 +309,7 @@
 
         document.getElementById('resultTitle').textContent = data.ranking_tier;
         document.getElementById('resultSubtitle').textContent =
-            `${data.candidate_name} (${data.enrollment}) · ${data.branch} · Sem ${data.semester} · ${data.job_role}`;
+            `${data.candidate_name} (${data.enrollment}) · ${data.branch} · Year ${data.year} · ${data.job_role}`;
 
         // Rank stats
         document.getElementById('rankValue').textContent       = `#${data.current_rank}`;
@@ -349,7 +349,7 @@
                     <strong>Congratulations! You're the FIRST!</strong>
                     You're the first candidate to submit a resume for
                     <strong>${escapeHtml(data.job_role)}</strong> in
-                    <strong>Semester ${data.semester}</strong>.
+                    <strong>year ${data.year}</strong>.
                     Check back later to see how you rank when peers submit.
                 </div>
             `;
@@ -436,7 +436,7 @@
 
         if (is_first)         return '🎯 You\'re the first! Percentile will be meaningful once more candidates submit.';
         if (total === 1)      return '🎯 You\'re the only candidate in this cohort so far.';
-        if (rank === 1)       return '🥇 Congratulations! You are the TOP candidate in your semester!';
+        if (rank === 1)       return '🥇 Congratulations! You are the TOP candidate in your year!';
         if (percentile >= 90) return `🌟 Outstanding! You're in the top 10% of ${total} candidates in your cohort.`;
         if (percentile >= 75) return `🎉 Great work! You're in the top 25% of your cohort.`;
         if (percentile >= 50) return `👍 You're in the top half of your cohort. Focus on missing skills to climb higher.`;
@@ -567,7 +567,7 @@
         resetFile();
         userName.value       = '';
         enrollmentInput.value = '';
-        semSelect.value      = '';
+        yearSelect.value      = '';
         branchSelect.value   = '';
         roleSelect.innerHTML = '<option value="">Select branch first</option>';
         roleSelect.disabled  = true;

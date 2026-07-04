@@ -1,223 +1,274 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Resume Ranking — EduQuest</title>
 
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap"
+      rel="stylesheet"
+    />
 
-    <link rel="stylesheet" href="../style.css">
-    <link rel="stylesheet" href="../utils.css">
-    <link rel="stylesheet" href="resume.css">
-    
-</head>
-<body>
-    
+    <link rel="stylesheet" href="../style.css" />
+    <link rel="stylesheet" href="../utils.css" />
+    <link rel="stylesheet" href="resume.css" />
+  </head>
+  <body>
     <!-- NAVBAR -->
     <nav class="navbar" id="navbar">
-        <div class="nav-inner">
-            <a href="../index.html" class="nav-logo">
-                <div class="nav-logo-icon">📚</div>
-                <span class="nav-logo-text">JaPari</span>
-            </a>
-            <ul class="nav-links" id="navLinks">
-                <li><a href="../index.html">Home</a></li>
-                <li><a href="../chat/chat.html">Chat</a></li>
-                <li><a href="../quiz/quiz.html">Quiz</a></li>
-                <li><a href="resume.html" class="active">Resume Rank</a></li>
-            </ul>
-            <button class="mobile-toggle" id="mobileToggle">
-                <span></span><span></span><span></span>
-            </button>
-        </div>
+      <div class="nav-inner">
+        <a href="../index.html" class="nav-logo">
+          <div class="nav-logo-icon">📚</div>
+          <span class="nav-logo-text">JaPari</span>
+        </a>
+        <ul class="nav-links" id="navLinks">
+          <li><a href="../index.html">Home</a></li>
+          <li><a href="../chat/chat.html">Chat</a></li>
+          <li><a href="../quiz/quiz.html">Quiz</a></li>
+          <li><a href="resume.html" class="active">Resume Rank</a></li>
+        </ul>
+        <button class="mobile-toggle" id="mobileToggle">
+          <span></span><span></span><span></span>
+        </button>
+      </div>
     </nav>
-    
+
     <!-- HERO -->
     <section class="resume-hero">
-        <div class="container">
-            <div class="resume-badge">📄 AI-Powered Resume Analyzer</div>
-            <h1>Where do you <em>stand?</em></h1>
-            <p>Upload your resume, pick your target role, and see how you rank among your peers in your semester. Get personalized skill recommendations to boost your profile.</p>
-        </div>
+      <div class="container">
+        <div class="resume-badge">📄 AI-Powered Resume Analyzer</div>
+        <h1>Where do you <em>stand?</em></h1>
+        <p>
+          Upload your resume, pick your target role, and see how you rank among
+          your peers in your semester. Get personalized skill recommendations to
+          boost your profile.
+        </p>
+      </div>
     </section>
-    
+
     <!-- UPLOAD -->
     <section class="upload-section">
-        <div class="container">
-            <div class="upload-card" id="uploadCard">
-                <form id="resumeForm">
-                    <!-- Personal Info -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="userName">👤 Your Name</label>
-                            <input type="text" id="userName" placeholder="e.g. John Doe" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="enrollment">🎫 Enrollment Number</label>
-                            <input type="text" id="enrollment" placeholder="e.g. 23103001" required>
-                            <small class="input-hint">Used to track your progress across submissions</small>
-                        </div>
-                    </div>
-                    
-                    <!-- Academic Info -->
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label for="semSelect">🎓 Semester</label>
-                            <select id="semSelect" required>
-                                <option value="">— Select semester —</option>
-                                <option value="3">Semester 3</option>
-                                <option value="4">Semester 4</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label for="branchSelect">🏛️ Branch / Domain</label>
-                            <select id="branchSelect" required>
-                                <option value="">— Select branch —</option>
-                            </select>
-                        </div>
-                    </div>
-                    
-                    <!-- Target Role -->
-                    <div class="form-group">
-                        <label for="roleSelect">💼 Target Job Role</label>
-                        <select id="roleSelect" required disabled>
-                            <option value="">Select branch first</option>
-                        </select>
-                        <small class="role-skills-hint" id="roleSkillsHint"></small>
-                    </div>
-                    
-                    <!-- Dropzone -->
-                    <div class="form-group">
-                        <label>📄 Upload Resume</label>
-                        <div class="dropzone" id="dropzone">
-                            <input type="file" id="resumeFile" accept=".pdf,.pptx" hidden>
-                            <div class="dropzone-content">
-                                <div class="dropzone-icon">📤</div>
-                                <h3>Drop your resume here</h3>
-                                <p>or <span class="dropzone-link">click to browse</span></p>
-                                <small>PDF or PPTX · Max 10MB</small>
-                            </div>
-                            <div class="dropzone-file" id="dropzoneFile" style="display:none;">
-                                <div class="file-icon">📄</div>
-                                <div class="file-info">
-                                    <strong id="fileName">—</strong>
-                                    <small id="fileSize">—</small>
-                                </div>
-                                <button type="button" class="file-remove" id="fileRemove">✕</button>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <button type="submit" class="analyze-btn" id="analyzeBtn" disabled>
-                        🚀 Analyze My Resume
-                    </button>
-                </form>
+      <div class="container">
+        <div class="upload-card" id="uploadCard">
+          <form id="resumeForm">
+            <!-- Personal Info -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="userName">👤 Your Name</label>
+                <input
+                  type="text"
+                  id="userName"
+                  placeholder="e.g. John Doe"
+                  required
+                />
+              </div>
+              <div class="form-group">
+                <label for="enrollment">🎫 Enrollment Number</label>
+                <input
+                  type="text"
+                  id="enrollment"
+                  placeholder="e.g. 23103001"
+                  required
+                />
+                <small class="input-hint"
+                  >Used to track your progress across submissions</small
+                >
+              </div>
             </div>
+
+            <!-- Academic Info -->
+            <div class="form-row">
+              <div class="form-group">
+                <label for="yearSelect">🎓 Year</label>
+                <select id="yearSelect" required>
+                  <option value="">— Select year —</option>
+                  <option value="1">Year 1</option>
+                  <option value="2">Year 2</option>
+                  <option value="3">Year 3</option>
+                  <option value="4">Year 4</option>
+                  <option value="5">Year 5</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="branchSelect">🏛️ Branch / Domain</label>
+                <select id="branchSelect" required>
+                  <option value="">— Select branch —</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Target Role -->
+            <div class="form-group">
+              <label for="roleSelect">💼 Target Job Role</label>
+              <select id="roleSelect" required disabled>
+                <option value="">Select branch first</option>
+              </select>
+              <small class="role-skills-hint" id="roleSkillsHint"></small>
+            </div>
+
+            <!-- Dropzone -->
+            <div class="form-group">
+              <label>📄 Upload Resume</label>
+              <div class="dropzone" id="dropzone">
+                <input type="file" id="resumeFile" accept=".pdf,.pptx" hidden />
+                <div class="dropzone-content">
+                  <div class="dropzone-icon">📤</div>
+                  <h3>Drop your resume here</h3>
+                  <p>or <span class="dropzone-link">click to browse</span></p>
+                  <small>PDF or PPTX · Max 10MB</small>
+                </div>
+                <div
+                  class="dropzone-file"
+                  id="dropzoneFile"
+                  style="display: none"
+                >
+                  <div class="file-icon">📄</div>
+                  <div class="file-info">
+                    <strong id="fileName">—</strong>
+                    <small id="fileSize">—</small>
+                  </div>
+                  <button type="button" class="file-remove" id="fileRemove">
+                    ✕
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <button type="submit" class="analyze-btn" id="analyzeBtn" disabled>
+              🚀 Analyze My Resume
+            </button>
+          </form>
         </div>
+      </div>
     </section>
 
     <!-- LOADING -->
-    <section class="loading-section" id="loadingSection" style="display:none;">
-        <div class="container">
-            <div class="loading-card">
-                <div class="loading-spinner"></div>
-                <h3 id="loadingText">Analyzing your resume…</h3>
-                <p>This may take a few seconds</p>
-            </div>
+    <section class="loading-section" id="loadingSection" style="display: none">
+      <div class="container">
+        <div class="loading-card">
+          <div class="loading-spinner"></div>
+          <h3 id="loadingText">Analyzing your resume…</h3>
+          <p>This may take a few seconds</p>
         </div>
+      </div>
     </section>
-    
-    <!-- RESULTS -->
-    <section class="results-section" id="resultsSection" style="display:none;">
-        <div class="container">
-            
-            <!-- Special status banner (first-time or update) -->
-            <div id="statusBanner" style="display:none;"></div>
-            
-            <!-- Hero Result -->
-            <div class="result-hero-card">
-                <div class="result-hero-left">
-                    <div class="result-score-circle">
-                        <svg viewBox="0 0 200 200">
-                            <circle cx="100" cy="100" r="90" stroke="#e5e2dd" stroke-width="14" fill="none"/>
-                            <circle cx="100" cy="100" r="90" stroke="#4318D9" stroke-width="14" fill="none"
-                            stroke-linecap="round" stroke-dasharray="565.48"
-                            id="scoreCircle"
-                                transform="rotate(-90 100 100)"/>
-                            </svg>
-                            <div class="score-text">
-                                <div class="score-number" id="scoreNumber">0</div>
-                                <div class="score-label">/ 100</div>
-                            </div>
-                        </div>
-                    </div>
-                <div class="result-hero-right">
-                    <div class="result-tag" id="resultTag">—</div>
-                    <h2 id="resultTitle">Your Resume Score</h2>
-                    <p id="resultSubtitle">—</p>
-                    
-                    <div class="rank-stats">
-                        <div class="rank-stat">
-                            <div class="rank-stat-value" id="rankValue">—</div>
-                            <div class="rank-stat-label">Your Rank</div>
-                        </div>
-                        <div class="rank-stat">
-                            <div class="rank-stat-value" id="percentileValue">—</div>
-                            <div class="rank-stat-label">Percentile</div>
-                        </div>
-                        <div class="rank-stat">
-                            <div class="rank-stat-value" id="cohortValue">—</div>
-                            <div class="rank-stat-label">Total in Cohort</div>
-                        </div>
-                    </div>
 
-                    <div class="standing-message" id="standingMessage"></div>
-                </div>
+    <!-- RESULTS -->
+    <section class="results-section" id="resultsSection" style="display: none">
+      <div class="container">
+        <!-- Special status banner (first-time or update) -->
+        <div id="statusBanner" style="display: none"></div>
+
+        <!-- Hero Result -->
+        <div class="result-hero-card">
+          <div class="result-hero-left">
+            <div class="result-score-circle">
+              <svg viewBox="0 0 200 200">
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="90"
+                  stroke="#e5e2dd"
+                  stroke-width="14"
+                  fill="none"
+                />
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="90"
+                  stroke="#4318D9"
+                  stroke-width="14"
+                  fill="none"
+                  stroke-linecap="round"
+                  stroke-dasharray="565.48"
+                  id="scoreCircle"
+                  transform="rotate(-90 100 100)"
+                />
+              </svg>
+              <div class="score-text">
+                <div class="score-number" id="scoreNumber">0</div>
+                <div class="score-label">/ 100</div>
+              </div>
             </div>
-            
-            <!-- Score change (only for updates) -->
-            <div class="score-change-card" id="scoreChangeCard" style="display:none;"></div>
-            
-            <!-- Breakdown -->
-            <div class="result-card">
-                <h3>📊 Score Breakdown</h3>
-                <p class="card-subtitle">How your final score was calculated</p>
-                <div class="breakdown-grid" id="breakdownGrid"></div>
+          </div>
+          <div class="result-hero-right">
+            <div class="result-tag" id="resultTag">—</div>
+            <h2 id="resultTitle">Your Resume Score</h2>
+            <p id="resultSubtitle">—</p>
+
+            <div class="rank-stats">
+              <div class="rank-stat">
+                <div class="rank-stat-value" id="rankValue">—</div>
+                <div class="rank-stat-label">Your Rank</div>
+              </div>
+              <div class="rank-stat">
+                <div class="rank-stat-value" id="percentileValue">—</div>
+                <div class="rank-stat-label">Percentile</div>
+              </div>
+              <div class="rank-stat">
+                <div class="rank-stat-value" id="cohortValue">—</div>
+                <div class="rank-stat-label">Total in Cohort</div>
+              </div>
             </div>
-            
-            <!-- Skills grid -->
-            <div class="skills-grid">
-                <div class="result-card">
-                    <h3>✅ Skills You Have</h3>
-                    <p class="card-subtitle" id="foundSkillsSubtitle">—</p>
-                    <div class="skills-container" id="foundSkillsContainer"></div>
-                </div>
-                
-                <div class="result-card">
-                    <h3>📚 Priority Skills to Learn</h3>
-                    <p class="card-subtitle">Prioritized recommendations for your target role</p>
-                    <div class="recommendations" id="recommendationsContainer"></div>
-                </div>
-            </div>
-            
-            <!-- Missing skills -->
-            <div class="result-card">
-                <h3>🎯 All Skill Gaps</h3>
-                <p class="card-subtitle">Complete list of skills missing from your resume</p>
-                <div class="missing-skills" id="missingSkillsContainer"></div>
-            </div>
-            
-            <!-- Actions -->
-            <div class="result-actions">
-                <button type="button" class="btn-primary" id="downloadBtn">📥 Download Report</button>
-                <button type="button" class="btn-secondary" id="newScanBtn">🔄 Analyze Another</button>
-            </div>
+
+            <div class="standing-message" id="standingMessage"></div>
+          </div>
         </div>
+
+        <!-- Score change (only for updates) -->
+        <div
+          class="score-change-card"
+          id="scoreChangeCard"
+          style="display: none"
+        ></div>
+
+        <!-- Breakdown -->
+        <div class="result-card">
+          <h3>📊 Score Breakdown</h3>
+          <p class="card-subtitle">How your final score was calculated</p>
+          <div class="breakdown-grid" id="breakdownGrid"></div>
+        </div>
+
+        <!-- Skills grid -->
+        <div class="skills-grid">
+          <div class="result-card">
+            <h3>✅ Skills You Have</h3>
+            <p class="card-subtitle" id="foundSkillsSubtitle">—</p>
+            <div class="skills-container" id="foundSkillsContainer"></div>
+          </div>
+
+          <div class="result-card">
+            <h3>📚 Priority Skills to Learn</h3>
+            <p class="card-subtitle">
+              Prioritized recommendations for your target role
+            </p>
+            <div class="recommendations" id="recommendationsContainer"></div>
+          </div>
+        </div>
+
+        <!-- Missing skills -->
+        <div class="result-card">
+          <h3>🎯 All Skill Gaps</h3>
+          <p class="card-subtitle">
+            Complete list of skills missing from your resume
+          </p>
+          <div class="missing-skills" id="missingSkillsContainer"></div>
+        </div>
+
+        <!-- Actions -->
+        <div class="result-actions">
+          <button type="button" class="btn-primary" id="downloadBtn">
+            📥 Download Report
+          </button>
+          <button type="button" class="btn-secondary" id="newScanBtn">
+            🔄 Analyze Another
+          </button>
+        </div>
+      </div>
     </section>
-    
+
     <script src="../script.js"></script>
     <script src="resume.js"></script>
-    
-</body>
+  </body>
 </html>

@@ -1,3 +1,5 @@
+# src/IR/resume_api.py
+
 import os
 import sys
 import tempfile
@@ -19,7 +21,7 @@ for _p in (PROJECT_ROOT, SRC_DIR, CURRENT_DIR, RESUME_PROJECT_DIR):
 
 
 # ─────────────────────────────────────────────
-# Load ranking + user_ranking modules via importlib
+# Load ranking + user_ranking modules
 # ─────────────────────────────────────────────
 def _load_module(name: str, path: str):
     spec   = importlib.util.spec_from_file_location(name, path)
@@ -41,7 +43,7 @@ user_ranking_module = _load_module("user_ranking", _USER_RANKING_PATH)
 
 
 # ─────────────────────────────────────────────
-# Expose functions we need
+# Expose functions
 # ─────────────────────────────────────────────
 rank_resume          = ranking_module.rank_resume
 job_skill_profiles   = ranking_module.job_skill_profiles
@@ -58,9 +60,7 @@ get_skills_list      = user_ranking_module.get_skills_list
 # Get available branches with their roles
 # ─────────────────────────────────────────────
 def get_branch_role_tree() -> dict:
-    """
-    Return {branch_name: [role_names]} for frontend cascading dropdowns.
-    """
+    """Return {branch_name: [role_names]} for cascading dropdowns."""
     tree = {}
     for branch in get_all_branches():
         tree[branch] = get_roles_by_branch(branch)
@@ -98,23 +98,21 @@ def extract_text_from_bytes(filename: str, file_bytes: bytes) -> str:
 
 
 # ─────────────────────────────────────────────
-# MAIN: analyze resume (new flow with sem + enrollment)
+# MAIN: analyze resume (year-based)
 # ─────────────────────────────────────────────
 def analyze_resume(
-    filename:    str,
-    file_bytes:  bytes,
-    user_name:   str,
-    enrollment:  str,
-    semester:    str,
-    branch:      str,
-    job_role:    str,
+    filename:   str,
+    file_bytes: bytes,
+    user_name:  str,
+    enrollment: str,
+    year:       str,
+    branch:     str,
+    job_role:   str,
 ) -> dict:
-    """
-    Full pipeline using new sem+enrollment+role CSV structure.
-    """
+    """Full pipeline using year+enrollment+role CSV structure."""
+
     # ── Validate role ────────────────────────
     if job_role not in job_skill_profiles:
-        # Fuzzy match
         match = None
         for r in job_skill_profiles.keys():
             if job_role.lower() in r.lower() or r.lower() in job_role.lower():
@@ -127,9 +125,9 @@ def analyze_resume(
             )
         job_role = match
 
-    # ── Validate semester ────────────────────
-    if str(semester) not in ("3", "4"):
-        raise ValueError(f"Semester must be 3 or 4, got '{semester}'")
+    # ── Validate year ────────────────────────
+    if str(year) not in ("1", "2", "3", "4", "5"):
+        raise ValueError(f"Year must be 1-5, got '{year}'")
 
     # ── Validate branch ──────────────────────
     if branch not in get_all_branches():
@@ -145,49 +143,44 @@ def analyze_resume(
     if not resume_text or len(resume_text.split()) < 10:
         raise ValueError("Could not extract enough text from resume.")
 
-    # ── Rank via existing logic ──────────────
+    # ── Rank ─────────────────────────────────
     result = rank_resume(resume_text, job_role)
     result["candidate_name"] = user_name
     result["enrollment"]     = enrollment
     result["resume_length"]  = len(resume_text.split())
-    result["semester"]       = str(semester)
+    result["year"]           = str(year)
     result["branch"]         = branch
 
-    # ── Update CSV → get meta ────────────────
-    meta = update_csv_with_user(result, str(semester), job_role)
+    # ── Update CSV ───────────────────────────
+    meta = update_csv_with_user(result, str(year), job_role)
 
-    # ── Build recommendations ────────────────
+    # ── Recommendations ──────────────────────
     recommendations = build_recommendations(
         missing_skills = result.get("missing_skills", []),
-        semester       = int(semester),
+        year           = int(year),
     )
 
-    # ── Required skills for context ──────────
     required_skills = get_skills_list(job_skill_profiles[job_role])
 
-    # ── Build response ───────────────────────
     return {
         "filename":         filename,
         "candidate_name":   user_name,
         "enrollment":       enrollment,
-        "semester":         str(semester),
+        "year":             str(year),
         "branch":           branch,
         "job_role":         job_role,
 
-        # Scores
         "final_score":            result["final_score"],
         "skill_match_percentage": result["skill_match_percentage"],
         "tfidf_similarity":       result["tfidf_similarity"],
         "ranking_tier":           result["ranking_tier"],
 
-        # Skills
         "found_skills":        result.get("found_skills",        []),
         "missing_skills":      result.get("missing_skills",      []),
         "top2_found_skills":   result.get("top2_found_skills",   []),
         "top2_missing_skills": result.get("top2_missing_skills", []),
         "required_skills":     required_skills,
 
-        # Rank meta
         "is_first":        meta["is_first"],
         "was_update":      meta["was_update"],
         "previous_rank":   meta["previous_rank"],
@@ -197,10 +190,7 @@ def analyze_resume(
         "percentile":      round((1 - (meta["current_rank"] - 1) / meta["total"]) * 100, 1) if meta["total"] > 0 else 0,
         "csv_path":        meta["csv_path"],
 
-        # Recommendations
         "recommendations": recommendations,
-
-        # Text preview
         "resume_word_count": len(resume_text.split()),
     }
 
@@ -208,7 +198,7 @@ def analyze_resume(
 # ─────────────────────────────────────────────
 # Recommendations
 # ─────────────────────────────────────────────
-def build_recommendations(missing_skills: list, semester: int = 3) -> list:
+def build_recommendations(missing_skills: list, year: int = 2) -> list:
     """Convert missing skills into prioritized recommendations."""
     recommendations = []
     for i, skill in enumerate(missing_skills[:8]):
@@ -222,9 +212,9 @@ def build_recommendations(missing_skills: list, semester: int = 3) -> list:
             priority = "low"
             reason   = "Good to have — adds depth to your resume."
 
-        if semester and semester <= 2 and priority == "high":
+        if year and year <= 2 and priority == "high":
             reason += " Start learning now while you have time."
-        elif semester and semester >= 3 and priority == "high":
+        elif year and year >= 3 and priority == "high":
             reason += " Prioritize this before placements."
 
         recommendations.append({

@@ -97,25 +97,25 @@ def sanitize_filename(name: str) -> str:
     return safe
 
 
-# ============== SEM + ROLE BASED CSV PATH ==============
+# ============== YEAR + ROLE BASED CSV PATH ==============
 
-def get_role_csv_path(semester: str, role: str) -> str:
+def get_role_csv_path(year: str, role: str) -> str:
     """
-    Return CSV path for a specific sem + role combination.
-    Creates the sem folder if it doesn't exist.
-    
+    Return CSV path for a specific year + role combination.
+    Creates the year folder if it doesn't exist.
+
     Path format:
-        resume_index_store/sem_3/rankings_Software_Developer.csv
+        resume_index_store/3/rankings_Software_Developer.csv
     """
-    sem_folder = os.path.join(RESUME_INDEX_STORE, f"sem_{semester}")
-    os.makedirs(sem_folder, exist_ok=True)
+    year_folder = os.path.join(RESUME_INDEX_STORE, str(year))
+    os.makedirs(year_folder, exist_ok=True)
 
     safe_role = sanitize_filename(role)
-    return os.path.join(sem_folder, f"rankings_{safe_role}.csv")
+    return os.path.join(year_folder, f"rankings_{safe_role}.csv")
 
 
 def load_existing_rankings(csv_path: str) -> list:
-    """Read role+sem-specific rankings CSV. Returns empty list if doesn't exist."""
+    """Read year+role-specific rankings CSV. Returns empty list if doesn't exist."""
     if not os.path.exists(csv_path):
         return []
 
@@ -141,14 +141,14 @@ def find_existing_by_enrollment(existing_rows: list, enrollment: str) -> dict:
     return None
 
 
-def update_csv_with_user(user_result: dict, semester: str, role: str) -> dict:
+def update_csv_with_user(user_result: dict, year: str, role: str) -> dict:
     """
-    Insert/update user result in sem+role-specific CSV, re-sort,
+    Insert/update user result in year+role-specific CSV, re-sort,
     recalculate ranks, rewrite file.
 
     Returns dict with:
         {
-            "is_first"        : bool  → True if first entry for this role
+            "is_first"        : bool  → True if first entry for this role+year
             "was_update"      : bool  → True if user resubmitted their resume
             "previous_rank"   : int   → previous rank (0 if new)
             "previous_score"  : float → previous score (0 if new)
@@ -158,7 +158,7 @@ def update_csv_with_user(user_result: dict, semester: str, role: str) -> dict:
             "csv_path"        : str
         }
     """
-    csv_path = get_role_csv_path(semester, role)
+    csv_path = get_role_csv_path(year, role)
     existing_rows = load_existing_rankings(csv_path)
 
     is_first     = len(existing_rows) == 0
@@ -180,7 +180,7 @@ def update_csv_with_user(user_result: dict, semester: str, role: str) -> dict:
         "rank"                  : 0,
         "enrollment"            : enrollment,
         "candidate_name"        : user_result["candidate_name"],
-        "semester"              : semester,
+        "year"                  : year,
         "branch"                : user_result.get("branch", "N/A"),
         "job_role"              : role,
         "final_score"           : f"{user_result['final_score']:.1f}%",
@@ -210,7 +210,7 @@ def update_csv_with_user(user_result: dict, semester: str, role: str) -> dict:
         row["percentile"] = f"{round((1 - (i - 1) / total) * 100, 1)}%"
 
     fieldnames = [
-        "rank", "enrollment", "candidate_name", "semester", "branch", "job_role",
+        "rank", "enrollment", "candidate_name", "year", "branch", "job_role",
         "final_score", "ranking_tier",
         "skill_match_percentage", "tfidf_similarity",
         "top2_found_skills", "top2_missing_skills",
@@ -226,7 +226,7 @@ def update_csv_with_user(user_result: dict, semester: str, role: str) -> dict:
                 "rank"                  : row.get("rank", ""),
                 "enrollment"            : row.get("enrollment", ""),
                 "candidate_name"        : row.get("candidate_name", ""),
-                "semester"              : row.get("semester", semester),
+                "year"                  : row.get("year", year),
                 "branch"                : row.get("branch", "N/A"),
                 "job_role"              : row.get("job_role", role),
                 "final_score"           : row.get("final_score", ""),
@@ -279,7 +279,7 @@ def display_first_time_result(result: dict, meta: dict) -> None:
     print(f"{Fore.CYAN}{'='*70}\n")
 
     print(f"  {Fore.GREEN}✨ You are the {Fore.YELLOW}FIRST{Fore.GREEN} candidate to submit a resume")
-    print(f"  {Fore.GREEN}   for {Fore.WHITE}'{result['job_role']}'{Fore.GREEN} in Semester {result.get('semester', 'N/A')}!\n")
+    print(f"  {Fore.GREEN}   for {Fore.WHITE}'{result['job_role']}'{Fore.GREEN} in Year {result.get('year', 'N/A')}!\n")
 
     print(f"  {Fore.WHITE}📊 Your Score Details:")
     print(f"     {Fore.WHITE}👤 Name              : {Fore.CYAN}{result['candidate_name']}")
@@ -332,7 +332,7 @@ def display_update_result(result: dict, meta: dict) -> None:
     print(f"  {Fore.WHITE}👤 Name              : {Fore.CYAN}{result['candidate_name']}")
     print(f"  {Fore.WHITE}🎫 Enrollment         : {Fore.CYAN}{result['enrollment']}")
     print(f"  {Fore.WHITE}🎯 Job Role           : {Fore.CYAN}{result['job_role']}")
-    print(f"  {Fore.WHITE}🎓 Semester           : {Fore.CYAN}{result.get('semester', 'N/A')}")
+    print(f"  {Fore.WHITE}🎓 Year               : {Fore.CYAN}{result.get('year', 'N/A')}")
 
     # ── Before vs After comparison ────────────────────────────────────────────
     print(f"\n{Fore.CYAN}{'─'*70}")
@@ -401,7 +401,7 @@ def display_normal_result(result: dict, meta: dict) -> None:
 
     print(f"  {Fore.WHITE}👤 Name              : {Fore.CYAN}{result['candidate_name']}")
     print(f"  {Fore.WHITE}🎫 Enrollment         : {Fore.CYAN}{result['enrollment']}")
-    print(f"  {Fore.WHITE}🎓 Semester           : {Fore.CYAN}{result.get('semester', 'N/A')}")
+    print(f"  {Fore.WHITE}🎓 Year               : {Fore.CYAN}{result.get('year', 'N/A')}")
     print(f"  {Fore.WHITE}🏛️  Branch             : {Fore.CYAN}{result.get('branch', 'N/A')}")
     print(f"  {Fore.WHITE}🎯 Job Role           : {Fore.CYAN}{result['job_role']}")
     print(f"  {Fore.WHITE}📊 Final Score        : {Fore.CYAN}{result['final_score']:.1f}%")
@@ -432,7 +432,7 @@ def display_normal_result(result: dict, meta: dict) -> None:
 
     print(f"\n  ", end="")
     if curr_rank == 1:
-        print(f"{Fore.GREEN}🥇 You are the TOP candidate for this role in your semester!")
+        print(f"{Fore.GREEN}🥇 You are the TOP candidate for this role in your year!")
     elif percentile >= 75:
         print(f"{Fore.GREEN}🎉 You are in the TOP 25% — great work!")
     elif percentile >= 50:
@@ -447,16 +447,17 @@ def display_normal_result(result: dict, meta: dict) -> None:
 
 # ============== INPUT HELPERS ==============
 
-def ask_semester() -> str:
-    print(f"\n{Fore.YELLOW}🎓 Which semester are you in?\n")
-    print(f"   {Fore.CYAN}[3]{Fore.WHITE} Semester 3")
-    print(f"   {Fore.CYAN}[4]{Fore.WHITE} Semester 4")
+def ask_year() -> str:
+    """Ask for year (1 through 5)."""
+    print(f"\n{Fore.YELLOW}🎓 Which year are you in?\n")
+    for y in range(1, 6):
+        print(f"   {Fore.CYAN}[{y}]{Fore.WHITE} Year {y}")
 
     while True:
-        choice = input(f"\n{Fore.CYAN}   Enter semester (3 or 4) : {Fore.WHITE}").strip()
-        if choice in ("3", "4"):
+        choice = input(f"\n{Fore.CYAN}   Enter year (1-5) : {Fore.WHITE}").strip()
+        if choice in ("1", "2", "3", "4", "5"):
             return choice
-        print(Fore.RED + "   Invalid. Please enter 3 or 4.")
+        print(Fore.RED + "   Invalid. Please enter a number from 1 to 5.")
 
 
 def ask_branch() -> str:
@@ -552,9 +553,9 @@ def main():
         print(Fore.RED + "❌ job_skill_profiles is empty. Check job_desc/")
         sys.exit(1)
 
-    # ── Step 1: Semester ─────────────────────────────────────────────────────
-    semester = ask_semester()
-    print(f"{Fore.GREEN}✅ Semester       : {Fore.WHITE}{semester}")
+    # ── Step 1: Year ─────────────────────────────────────────────────────────
+    year = ask_year()
+    print(f"{Fore.GREEN}✅ Year           : {Fore.WHITE}{year}")
 
     # ── Step 2: Branch ───────────────────────────────────────────────────────
     branch = ask_branch()
@@ -590,11 +591,11 @@ def main():
     result["candidate_name"] = user_name
     result["enrollment"]     = enrollment
     result["resume_length"]  = len(resume_text.split())
-    result["semester"]       = semester
+    result["year"]           = year
     result["branch"]         = branch
 
-    # ── Step 9: Update role+sem-specific CSV ────────────────────────────────
-    meta = update_csv_with_user(result, semester, selected_role)
+    # ── Step 9: Update role+year-specific CSV ───────────────────────────────
+    meta = update_csv_with_user(result, year, selected_role)
 
     # ── Step 10: Display appropriate result ──────────────────────────────────
     if meta["is_first"]:
