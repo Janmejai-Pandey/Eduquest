@@ -1,0 +1,20 @@
+{
+    "liveServer.settings.ignoreFiles": [
+        "**/.vscode/**",
+        "**/*.scss",
+        "**/*.sass",
+        "**/*.ts",
+        "**/*.csv",
+        "**/*.json",
+        "**/*.pkl",
+        "**/*.index",
+        "**/*.md",
+        "**/index_store/**",
+        "**/resume_index_store/**",
+        "**/quizzes/**",
+        "**/summaries/**",
+        "**/dataset/**",
+        "**/__pycache__/**",
+        "**/.venv/**"
+    ]
+}

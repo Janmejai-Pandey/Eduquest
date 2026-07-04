@@ -1,12 +1,17 @@
+/* ════════════════════════════════════════════════════════════
+   RESUME RANKING — With sem + enrollment + branch tracking
+   ════════════════════════════════════════════════════════════ */
+
 (function () {
     'use strict';
 
     const API_URL = 'http://localhost:8000';
 
-    // ── DOM ──
+    // DOM
     const userName        = document.getElementById('userName');
+    const enrollmentInput = document.getElementById('enrollment');
+    const semSelect       = document.getElementById('semSelect');
     const branchSelect    = document.getElementById('branchSelect');
-    const yearSelect      = document.getElementById('yearSelect');
     const roleSelect      = document.getElementById('roleSelect');
     const roleSkillsHint  = document.getElementById('roleSkillsHint');
     const dropzone        = document.getElementById('dropzone');
@@ -18,53 +23,107 @@
     const fileRemove      = document.getElementById('fileRemove');
     const form            = document.getElementById('resumeForm');
     const analyzeBtn      = document.getElementById('analyzeBtn');
-    const uploadCard      = document.getElementById('uploadCard');
+    const uploadSection   = document.querySelector('.upload-section');
     const loadingSection  = document.getElementById('loadingSection');
     const resultsSection  = document.getElementById('resultsSection');
     const loadingText     = document.getElementById('loadingText');
+    const resumeHero      = document.querySelector('.resume-hero');
 
+    // State
     let selectedFile = null;
     let lastResult   = null;
-    let rolesData    = [];
+    let branchTree   = {};   // {branch: [roles]}
+    let roleSkillsMap = {};  // {role: [skills]} — cached
 
 
     // ════════════════════════════════════════
-    // 1. LOAD ROLES
+    // 1. LOAD BRANCHES & ROLES
     // ════════════════════════════════════════
-    async function loadRoles() {
+    async function loadBranches() {
         try {
-            const res  = await fetch(`${API_URL}/resume/roles`);
+            const res  = await fetch(`${API_URL}/resume/branches`);
             const data = await res.json();
-            rolesData  = data.roles;
+            branchTree = data.tree || {};
 
-            roleSelect.innerHTML = '<option value="">— Select target role —</option>';
-            rolesData.forEach(role => {
+            branchSelect.innerHTML = '<option value="">— Select branch —</option>';
+            Object.keys(branchTree).sort().forEach(b => {
                 const opt = document.createElement('option');
-                opt.value = role.name;
-                opt.textContent = `${role.name} (${role.skills_count} skills)`;
-                roleSelect.appendChild(opt);
+                opt.value = b;
+                opt.textContent = b;
+                branchSelect.appendChild(opt);
             });
         } catch (err) {
-            console.error('Cannot load roles:', err);
-            roleSelect.innerHTML = '<option value="">⚠ Cannot connect to backend</option>';
+            console.error('Failed to load branches:', err);
+            branchSelect.innerHTML = '<option>⚠ Cannot connect</option>';
         }
     }
 
-    roleSelect.addEventListener('change', () => {
-        const role = rolesData.find(r => r.name === roleSelect.value);
-        if (role && role.skills.length > 0) {
-            const preview = role.skills.slice(0, 6).join(', ');
-            const extra   = role.skills.length > 6 ? ` and ${role.skills.length - 6} more…` : '';
-            roleSkillsHint.textContent = `💡 Skills required: ${preview}${extra}`;
-        } else {
+    // Populate role dropdown when branch changes
+    branchSelect.addEventListener('change', () => {
+        const branch = branchSelect.value;
+
+        if (!branch) {
+            roleSelect.innerHTML = '<option value="">Select branch first</option>';
+            roleSelect.disabled = true;
             roleSkillsHint.textContent = '';
+            checkFormValid();
+            return;
+        }
+
+        const roles = branchTree[branch] || [];
+
+        roleSelect.innerHTML = '<option value="">— Select target role —</option>';
+        roles.forEach(r => {
+            const opt = document.createElement('option');
+            opt.value = r;
+            opt.textContent = r;
+            roleSelect.appendChild(opt);
+        });
+
+        roleSelect.disabled = false;
+        roleSelect.value = '';
+        roleSkillsHint.textContent = '';
+        checkFormValid();
+    });
+
+    // Fetch skills when role changes
+    roleSelect.addEventListener('change', async () => {
+        const role = roleSelect.value;
+        if (!role) {
+            roleSkillsHint.textContent = '';
+            checkFormValid();
+            return;
+        }
+
+        // Check cache
+        if (roleSkillsMap[role]) {
+            displayRoleSkills(role, roleSkillsMap[role]);
+        } else {
+            try {
+                const res = await fetch(`${API_URL}/resume/skills/${encodeURIComponent(role)}`);
+                const data = await res.json();
+                roleSkillsMap[role] = data.skills || [];
+                displayRoleSkills(role, data.skills);
+            } catch (err) {
+                roleSkillsHint.textContent = '⚠ Could not load skills';
+            }
         }
         checkFormValid();
     });
 
+    function displayRoleSkills(role, skills) {
+        if (!skills || skills.length === 0) {
+            roleSkillsHint.textContent = '';
+            return;
+        }
+        const preview = skills.slice(0, 8).join(', ');
+        const extra   = skills.length > 8 ? ` and ${skills.length - 8} more…` : '';
+        roleSkillsHint.textContent = `💡 Top skills for ${role}: ${preview}${extra}`;
+    }
+
 
     // ════════════════════════════════════════
-    // 2. DROPZONE & FILE HANDLING
+    // 2. DROPZONE
     // ════════════════════════════════════════
     dropzone.addEventListener('click', () => fileInput.click());
 
@@ -131,7 +190,7 @@
     // ════════════════════════════════════════
     // 3. FORM VALIDATION
     // ════════════════════════════════════════
-    [userName, roleSelect].forEach(el => {
+    [userName, enrollmentInput, semSelect, branchSelect, roleSelect].forEach(el => {
         el.addEventListener('input',  checkFormValid);
         el.addEventListener('change', checkFormValid);
     });
@@ -139,6 +198,9 @@
     function checkFormValid() {
         analyzeBtn.disabled = !(
             userName.value.trim() &&
+            enrollmentInput.value.trim().length >= 4 &&
+            semSelect.value &&
+            branchSelect.value &&
             roleSelect.value &&
             selectedFile
         );
@@ -156,11 +218,12 @@
 
         try {
             const formData = new FormData();
-            formData.append('file',     selectedFile);
-            formData.append('name',     userName.value.trim());
-            formData.append('job_role', roleSelect.value);
-            formData.append('branch',   branchSelect.value);
-            formData.append('year',     yearSelect.value);
+            formData.append('file',       selectedFile);
+            formData.append('name',       userName.value.trim());
+            formData.append('enrollment', enrollmentInput.value.trim().toUpperCase());
+            formData.append('semester',   semSelect.value);
+            formData.append('branch',     branchSelect.value);
+            formData.append('job_role',   roleSelect.value);
 
             const res = await fetch(`${API_URL}/resume/analyze`, {
                 method: 'POST',
@@ -184,7 +247,7 @@
     });
 
     function showLoading() {
-        uploadCard.style.display     = 'none';
+        uploadSection.style.display     = 'none';
         loadingSection.style.display = 'block';
         resultsSection.style.display = 'none';
 
@@ -192,7 +255,7 @@
             'Extracting text from resume…',
             'Analyzing skills…',
             'Computing TF-IDF similarity…',
-            'Calculating your rank…',
+            'Calculating your rank in your cohort…',
             'Building recommendations…',
         ];
         let i = 0;
@@ -207,7 +270,7 @@
     }
 
     function hideLoading() {
-        uploadCard.style.display     = 'block';
+        uploadSection.style.display     = 'block';
         loadingSection.style.display = 'none';
         resultsSection.style.display = 'none';
     }
@@ -217,6 +280,8 @@
     // 5. RENDER RESULTS
     // ════════════════════════════════════════
     function showResults(data) {
+
+        resumeHero.style.display = 'none';
         loadingSection.style.display = 'none';
         resultsSection.style.display = 'block';
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -230,30 +295,33 @@
             document.getElementById('scoreCircle').style.strokeDashoffset = offset;
         }, 100);
 
-        // Animate number
         animateNumber('scoreNumber', 0, Math.round(score), 1500);
 
-        // Tag + title from your tier
+        // Status banner (first-time or update)
+        renderStatusBanner(data);
+
+        // Tag + title
         const tagInfo = getTagFromTier(data.ranking_tier);
         const tagEl = document.getElementById('resultTag');
-        tagEl.textContent           = tagInfo.label;
-        tagEl.style.background      = tagInfo.bg;
-        tagEl.style.color           = tagInfo.color;
+        tagEl.textContent = tagInfo.label;
+        tagEl.style.background = tagInfo.bg;
+        tagEl.style.color = tagInfo.color;
 
-        document.getElementById('resultTitle').textContent    = data.ranking_tier;
+        document.getElementById('resultTitle').textContent = data.ranking_tier;
         document.getElementById('resultSubtitle').textContent =
-            `${data.candidate_name} · ${data.job_role}` +
-            (data.branch ? ` · ${data.branch}` : '') +
-            (data.year   ? ` · Year ${data.year}` : '');
+            `${data.candidate_name} (${data.enrollment}) · ${data.branch} · Sem ${data.semester} · ${data.job_role}`;
 
         // Rank stats
-        document.getElementById('rankValue').textContent       = `#${data.rank}`;
+        document.getElementById('rankValue').textContent       = `#${data.current_rank}`;
         document.getElementById('percentileValue').textContent = `Top ${data.percentile}%`;
-        document.getElementById('cohortValue').textContent     = data.total_candidates;
+        document.getElementById('cohortValue').textContent     = data.total;
 
         // Standing message
         document.getElementById('standingMessage').textContent =
-            getStandingMessage(data.rank, data.percentile, data.total_candidates);
+            getStandingMessage(data);
+
+        // Score change (only for updates)
+        renderScoreChange(data);
 
         // Breakdown
         renderBreakdown(data);
@@ -264,9 +332,95 @@
         // Recommendations
         renderRecommendations(data.recommendations);
 
-        // Missing skills (all)
+        // Missing skills
         renderMissingSkills(data.missing_skills);
     }
+
+
+    function renderStatusBanner(data) {
+        const banner = document.getElementById('statusBanner');
+
+        if (data.is_first) {
+            banner.className = 'first-time';
+            banner.style.display = 'flex';
+            banner.innerHTML = `
+                <div class="banner-icon">🎉</div>
+                <div class="banner-content">
+                    <strong>Congratulations! You're the FIRST!</strong>
+                    You're the first candidate to submit a resume for
+                    <strong>${escapeHtml(data.job_role)}</strong> in
+                    <strong>Semester ${data.semester}</strong>.
+                    Check back later to see how you rank when peers submit.
+                </div>
+            `;
+        } else if (data.was_update) {
+            banner.className = 'update';
+            banner.style.display = 'flex';
+            banner.innerHTML = `
+                <div class="banner-icon">🔄</div>
+                <div class="banner-content">
+                    <strong>Resume Updated!</strong>
+                    We've replaced your previous submission for
+                    <strong>${escapeHtml(data.job_role)}</strong>.
+                    See how you changed below.
+                </div>
+            `;
+        } else {
+            banner.style.display = 'none';
+        }
+    }
+
+
+    function renderScoreChange(data) {
+        const card = document.getElementById('scoreChangeCard');
+
+        if (!data.was_update) {
+            card.style.display = 'none';
+            return;
+        }
+
+        const prevScore = data.previous_score;
+        const currScore = data.final_score;
+        const scoreDelta = currScore - prevScore;
+
+        const prevRank = data.previous_rank;
+        const currRank = data.current_rank;
+        const rankDelta = prevRank - currRank;  // positive = improved
+
+        card.style.display = 'block';
+        card.innerHTML = `
+            <h3>📊 Your Progress</h3>
+            <div class="score-change-grid">
+                <div class="change-item">
+                    <div class="change-item-label">Score</div>
+                    <div class="change-values">
+                        <span class="change-before">${prevScore.toFixed(1)}%</span>
+                        <span class="change-arrow">→</span>
+                        <span class="change-after">${currScore.toFixed(1)}%</span>
+                    </div>
+                    <div class="change-delta ${scoreDelta > 0 ? 'positive' : (scoreDelta < 0 ? 'negative' : 'neutral')}">
+                        ${scoreDelta > 0 ? '⬆ +' : (scoreDelta < 0 ? '⬇ ' : '')}${scoreDelta.toFixed(1)}%
+                        ${scoreDelta === 0 ? '(no change)' : ''}
+                    </div>
+                </div>
+
+                <div class="change-item">
+                    <div class="change-item-label">Rank</div>
+                    <div class="change-values">
+                        <span class="change-before">#${prevRank}</span>
+                        <span class="change-arrow">→</span>
+                        <span class="change-after">#${currRank}</span>
+                    </div>
+                    <div class="change-delta ${rankDelta > 0 ? 'positive' : (rankDelta < 0 ? 'negative' : 'neutral')}">
+                        ${rankDelta > 0 ? `⬆ Up ${rankDelta} place${rankDelta > 1 ? 's' : ''}` : ''}
+                        ${rankDelta < 0 ? `⬇ Down ${Math.abs(rankDelta)} place${Math.abs(rankDelta) > 1 ? 's' : ''}` : ''}
+                        ${rankDelta === 0 ? '(same rank)' : ''}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
 
     function getTagFromTier(tier) {
         if (tier.includes('Excellent')) return { label: 'Excellent',     bg: '#dcfce7', color: '#15803d' };
@@ -276,15 +430,20 @@
         return                                  { label: 'Needs Work',   bg: '#fee2e2', color: '#dc2626' };
     }
 
-    function getStandingMessage(rank, percentile, total) {
-        if (total === 1)        return '🎯 You\'re the first candidate in the system. Upload more to see your rank!';
-        if (rank === 1)         return '🥇 Congratulations! You are the TOP candidate among all applicants!';
-        if (percentile >= 90)   return `🌟 Outstanding! You're in the top 10% of ${total} candidates.`;
-        if (percentile >= 75)   return `🎉 Great work! You're in the top 25% of all candidates.`;
-        if (percentile >= 50)   return `👍 You're in the top half. Focus on the missing skills to climb higher.`;
-        if (percentile >= 25)   return `📌 You're in the bottom half. Work on the priority skills listed below.`;
-        return                         `⚠️ You're in the bottom 25%. Focus on the high-priority skills to improve.`;
+
+    function getStandingMessage(data) {
+        const { current_rank: rank, total, percentile, is_first } = data;
+
+        if (is_first)         return '🎯 You\'re the first! Percentile will be meaningful once more candidates submit.';
+        if (total === 1)      return '🎯 You\'re the only candidate in this cohort so far.';
+        if (rank === 1)       return '🥇 Congratulations! You are the TOP candidate in your semester!';
+        if (percentile >= 90) return `🌟 Outstanding! You're in the top 10% of ${total} candidates in your cohort.`;
+        if (percentile >= 75) return `🎉 Great work! You're in the top 25% of your cohort.`;
+        if (percentile >= 50) return `👍 You're in the top half of your cohort. Focus on missing skills to climb higher.`;
+        if (percentile >= 25) return `📌 You're in the bottom half. Work on the priority skills below.`;
+        return                       `⚠️ You're in the bottom 25% of your cohort. Focus on the high-priority skills to improve.`;
     }
+
 
     function animateNumber(elId, start, end, duration) {
         const el = document.getElementById(elId);
@@ -299,31 +458,28 @@
         requestAnimationFrame(update);
     }
 
+
     function renderBreakdown(data) {
         const grid = document.getElementById('breakdownGrid');
 
-        // Your ranking.py uses: 70% skill match + 30% TF-IDF = final score
         const items = [
             {
-                label:      'Final Score',
-                value:      data.final_score,
-                max:        100,
-                weight:     '100% (overall)',
-                pct:        data.final_score,
+                label:  'Final Score',
+                value:  data.final_score,
+                weight: '100% (overall)',
+                pct:    data.final_score,
             },
             {
-                label:      'Skill Match',
-                value:      data.skill_match_percentage,
-                max:        100,
-                weight:     '70% weight',
-                pct:        data.skill_match_percentage,
+                label:  'Skill Match',
+                value:  data.skill_match_percentage,
+                weight: '70% weight',
+                pct:    data.skill_match_percentage,
             },
             {
-                label:      'TF-IDF Similarity',
-                value:      data.tfidf_similarity,
-                max:        100,
-                weight:     '30% weight',
-                pct:        data.tfidf_similarity,
+                label:  'TF-IDF Similarity',
+                value:  data.tfidf_similarity,
+                weight: '30% weight',
+                pct:    data.tfidf_similarity,
             },
         ];
 
@@ -337,27 +493,29 @@
         `).join('');
     }
 
+
     function renderFoundSkills(data) {
         const container = document.getElementById('foundSkillsContainer');
         const subtitle  = document.getElementById('foundSkillsSubtitle');
-        const found     = data.found_skills || [];
+        const found     = data.found_skills    || [];
         const required  = data.required_skills || [];
         const top2      = data.top2_found_skills || [];
 
         subtitle.textContent = `${found.length} of ${required.length} required skills matched`;
 
         if (found.length === 0) {
-            container.innerHTML = '<p style="color:#8a8a9a;">No required skills detected. Try adding skill keywords like Python, SQL, etc.</p>';
+            container.innerHTML = '<p style="color:#8a8a9a;">No required skills detected. Try adding relevant skill keywords to your resume.</p>';
             return;
         }
 
         container.innerHTML = found.map(skill => {
             const isPriority = top2.includes(skill);
-            const cls = isPriority ? 'skill-chip priority' : 'skill-chip';
+            const cls  = isPriority ? 'skill-chip priority' : 'skill-chip';
             const star = isPriority ? '⭐ ' : '';
             return `<span class="${cls}">${star}${escapeHtml(skill)}</span>`;
         }).join('');
     }
+
 
     function renderRecommendations(recs) {
         const container = document.getElementById('recommendationsContainer');
@@ -376,6 +534,7 @@
         `).join('');
     }
 
+
     function renderMissingSkills(missing) {
         const container = document.getElementById('missingSkillsContainer');
         if (!missing || missing.length === 0) {
@@ -392,6 +551,7 @@
         `;
     }
 
+
     function escapeHtml(str) {
         if (!str) return '';
         const div = document.createElement('div');
@@ -405,13 +565,16 @@
     // ════════════════════════════════════════
     document.getElementById('newScanBtn').addEventListener('click', () => {
         resetFile();
-        userName.value     = '';
-        roleSelect.value   = '';
-        branchSelect.value = '';
-        yearSelect.value   = '0';
+        userName.value       = '';
+        enrollmentInput.value = '';
+        semSelect.value      = '';
+        branchSelect.value   = '';
+        roleSelect.innerHTML = '<option value="">Select branch first</option>';
+        roleSelect.disabled  = true;
         roleSkillsHint.textContent = '';
         checkFormValid();
-        uploadCard.style.display     = 'block';
+        resumeHero.style.display = 'block';
+        uploadSection.style.display     = 'block';
         loadingSection.style.display = 'none';
         resultsSection.style.display = 'none';
         window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -424,7 +587,7 @@
         const url  = URL.createObjectURL(blob);
         const a    = document.createElement('a');
         a.href     = url;
-        a.download = `resume-analysis-${lastResult.candidate_name.replace(/\s/g, '_')}.json`;
+        a.download = `resume-analysis-${lastResult.enrollment}-${Date.now()}.json`;
         a.click();
         URL.revokeObjectURL(url);
     });
@@ -433,7 +596,7 @@
     // ════════════════════════════════════════
     // 7. INIT
     // ════════════════════════════════════════
-    loadRoles();
+    loadBranches();
     console.log('📄 Resume page ready');
 
 })();

@@ -338,36 +338,44 @@ def natural_sort_key(text: str) -> tuple:
 from fastapi import UploadFile, File, Form
 from resume_api import (
     analyze_resume,
-    get_available_roles,
-    get_csv_stats,
+    get_branch_role_tree,
+    get_role_skills,
 )
 
 
-@app.get("/resume/roles")
-def list_roles():
-    """Get available job roles with their skills."""
-    return {"roles": get_available_roles()}
+@app.get("/resume/branches")
+def list_branches_roles():
+    """Get all branches with their roles for cascading dropdowns."""
+    return {"tree": get_branch_role_tree()}
 
 
-@app.get("/resume/stats")
-def resume_stats():
-    """Get stats about existing rankings."""
-    return get_csv_stats()
+@app.get("/resume/skills/{role_name}")
+def get_skills_for_role(role_name: str):
+    """Get required skills for a specific role."""
+    skills = get_role_skills(role_name)
+    return {"role": role_name, "skills": skills, "count": len(skills)}
 
 
 @app.post("/resume/analyze")
 async def analyze_resume_endpoint(
-    file:     UploadFile = File(...),
-    name:     str        = Form(...),
-    job_role: str        = Form(...),
-    branch:   str        = Form(""),
-    year:     int        = Form(0),
+    file:       UploadFile = File(...),
+    name:       str        = Form(...),
+    enrollment: str        = Form(...),
+    semester:   str        = Form(...),
+    branch:     str        = Form(...),
+    job_role:   str        = Form(...),
 ):
-    """Analyze uploaded resume."""
+    """Analyze uploaded resume with sem/branch/enrollment tracking."""
     try:
         # Validation
         if not name.strip():
             raise HTTPException(status_code=400, detail="Name is required")
+        if not enrollment.strip():
+            raise HTTPException(status_code=400, detail="Enrollment is required")
+        if semester not in ("3", "4"):
+            raise HTTPException(status_code=400, detail="Semester must be 3 or 4")
+        if not branch.strip():
+            raise HTTPException(status_code=400, detail="Branch is required")
 
         file_bytes = await file.read()
         if len(file_bytes) == 0:
@@ -375,7 +383,6 @@ async def analyze_resume_endpoint(
         if len(file_bytes) > 10 * 1024 * 1024:
             raise HTTPException(status_code=400, detail="File too large (max 10MB)")
 
-        # Check extension
         ext = file.filename.lower().split('.')[-1]
         if ext not in ['pdf', 'pptx']:
             raise HTTPException(
@@ -383,17 +390,19 @@ async def analyze_resume_endpoint(
                 detail=f"Unsupported file type '.{ext}'. Use PDF or PPTX."
             )
 
-        # Analyze
         result = analyze_resume(
             filename   = file.filename,
             file_bytes = file_bytes,
             user_name  = name.strip(),
-            job_role   = job_role.strip(),
+            enrollment = enrollment.strip(),
+            semester   = semester,
             branch     = branch.strip(),
-            year       = year,
+            job_role   = job_role.strip(),
         )
         return result
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:

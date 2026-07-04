@@ -1,51 +1,96 @@
 import os
 import sys
 import tempfile
-# import importlib.util
-from typing import Any
+import importlib.util
 from pathlib import Path
 
-# from altair import Dict
-import user_ranking as ur
-import ranking as r
+
+# ─────────────────────────────────────────────
+# Path setup
+# ─────────────────────────────────────────────
+CURRENT_DIR        = os.path.dirname(os.path.abspath(__file__))
+SRC_DIR            = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
+PROJECT_ROOT       = os.path.abspath(os.path.join(SRC_DIR, ".."))
+RESUME_PROJECT_DIR = os.path.join(SRC_DIR, "resume_project")
+
+for _p in (PROJECT_ROOT, SRC_DIR, CURRENT_DIR, RESUME_PROJECT_DIR):
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
 
 
 # ─────────────────────────────────────────────
-# Helper: list available roles
+# Load ranking + user_ranking modules via importlib
 # ─────────────────────────────────────────────
-def get_available_roles() -> list[dict[str, Any]]:
-    """Return all roles with their skills."""
-    roles = []
-    for role_name, value in r.job_skill_profiles.items():
-        skills = ur.get_skills_list(value)
-        roles.append({
-            "name":         role_name,
-            "skills":       skills,
-            "skills_count": len(skills),
-        })
-    return roles
+def _load_module(name: str, path: str):
+    spec   = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+_RANKING_PATH      = os.path.join(RESUME_PROJECT_DIR, "ranking.py")
+_USER_RANKING_PATH = os.path.join(RESUME_PROJECT_DIR, "user_ranking.py")
+
+if not os.path.exists(_RANKING_PATH):
+    raise FileNotFoundError(f"❌ ranking.py not found at: {_RANKING_PATH}")
+if not os.path.exists(_USER_RANKING_PATH):
+    raise FileNotFoundError(f"❌ user_ranking.py not found at: {_USER_RANKING_PATH}")
+
+ranking_module      = _load_module("ranking",      _RANKING_PATH)
+user_ranking_module = _load_module("user_ranking", _USER_RANKING_PATH)
 
 
 # ─────────────────────────────────────────────
-# Helper: extract text from uploaded file bytes
-# (your extract_resume_text needs a filepath, so save bytes to temp file)
+# Expose functions we need
+# ─────────────────────────────────────────────
+rank_resume          = ranking_module.rank_resume
+job_skill_profiles   = ranking_module.job_skill_profiles
+BRANCH_PROFILES      = ranking_module.BRANCH_PROFILES
+get_roles_by_branch  = ranking_module.get_roles_by_branch
+get_all_branches     = ranking_module.get_all_branches
+
+extract_resume_text  = user_ranking_module.extract_resume_text
+update_csv_with_user = user_ranking_module.update_csv_with_user
+get_skills_list      = user_ranking_module.get_skills_list
+
+
+# ─────────────────────────────────────────────
+# Get available branches with their roles
+# ─────────────────────────────────────────────
+def get_branch_role_tree() -> dict:
+    """
+    Return {branch_name: [role_names]} for frontend cascading dropdowns.
+    """
+    tree = {}
+    for branch in get_all_branches():
+        tree[branch] = get_roles_by_branch(branch)
+    return tree
+
+
+def get_role_skills(role_name: str) -> list:
+    """Get the required skills for a specific role."""
+    if role_name not in job_skill_profiles:
+        return []
+    return get_skills_list(job_skill_profiles[role_name])
+
+
+# ─────────────────────────────────────────────
+# Extract text from uploaded file bytes
 # ─────────────────────────────────────────────
 def extract_text_from_bytes(filename: str, file_bytes: bytes) -> str:
-    """Save uploaded bytes to temp file → run your extractor → cleanup."""
+    """Save uploaded bytes to temp file → run extractor → cleanup."""
     ext = Path(filename).suffix.lower()
     if ext not in (".pdf", ".pptx"):
         raise ValueError(f"Unsupported file type '{ext}'. Use .pdf or .pptx")
 
-    # Create temp file with same extension
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
         tmp.write(file_bytes)
         tmp_path = tmp.name
 
     try:
-        text = ur.extract_resume_text(tmp_path)
+        text = extract_resume_text(tmp_path)
         return text
     finally:
-        # Cleanup temp file
         try:
             os.unlink(tmp_path)
         except Exception:
@@ -53,69 +98,81 @@ def extract_text_from_bytes(filename: str, file_bytes: bytes) -> str:
 
 
 # ─────────────────────────────────────────────
-# Main pipeline — analyze + rank a single resume
+# MAIN: analyze resume (new flow with sem + enrollment)
 # ─────────────────────────────────────────────
 def analyze_resume(
-    filename:   str,
-    file_bytes: bytes,
-    user_name:  str,
-    job_role:   str,
-    branch:     str = "",
-    year:       int = 0,
-) -> dict[str, Any]:
+    filename:    str,
+    file_bytes:  bytes,
+    user_name:   str,
+    enrollment:  str,
+    semester:    str,
+    branch:      str,
+    job_role:    str,
+) -> dict:
     """
-    Full pipeline:
-      1. Extract text from uploaded file
-      2. Use your rank_resume() to score it
-      3. Update CSV with new entry
-      4. Return rank, percentile, skills, recommendations
+    Full pipeline using new sem+enrollment+role CSV structure.
     """
-
-    # ── Validate role ────────────────────────────────────────
-    if job_role not in r.job_skill_profiles:
-        # Try fuzzy match
+    # ── Validate role ────────────────────────
+    if job_role not in job_skill_profiles:
+        # Fuzzy match
         match = None
-        for skill in r.job_skill_profiles.keys():
-            if job_role.lower() in skill.lower() or skill.lower() in job_role.lower():
-                match = skill
+        for r in job_skill_profiles.keys():
+            if job_role.lower() in r.lower() or r.lower() in job_role.lower():
+                match = r
                 break
         if not match:
             raise ValueError(
                 f"Job role '{job_role}' not found. "
-                f"Available: {list(r.job_skill_profiles.keys())}"
+                f"Available: {list(job_skill_profiles.keys())[:10]}..."
             )
         job_role = match
 
-    # ── Step 1: Extract text ────────────────────────────────
+    # ── Validate semester ────────────────────
+    if str(semester) not in ("3", "4"):
+        raise ValueError(f"Semester must be 3 or 4, got '{semester}'")
+
+    # ── Validate branch ──────────────────────
+    if branch not in get_all_branches():
+        raise ValueError(f"Invalid branch '{branch}'. Available: {get_all_branches()}")
+
+    # ── Validate enrollment ──────────────────
+    enrollment = enrollment.strip().upper()
+    if not enrollment or len(enrollment) < 4:
+        raise ValueError("Enrollment must be at least 4 characters")
+
+    # ── Extract resume text ──────────────────
     resume_text = extract_text_from_bytes(filename, file_bytes)
     if not resume_text or len(resume_text.split()) < 10:
         raise ValueError("Could not extract enough text from resume.")
 
-    # ── Step 2: Rank using your existing logic ──────────────
-    result = r.rank_resume(resume_text, job_role)
+    # ── Rank via existing logic ──────────────
+    result = rank_resume(resume_text, job_role)
     result["candidate_name"] = user_name
+    result["enrollment"]     = enrollment
     result["resume_length"]  = len(resume_text.split())
+    result["semester"]       = str(semester)
+    result["branch"]         = branch
 
-    # ── Step 3: Update CSV → get rank ───────────────────────
-    user_rank, total = ur.update_csv_with_user(result, r.CSV_PATH)
-    percentile = round((1 - (user_rank - 1) / total) * 100, 1) if total > 0 else 0
+    # ── Update CSV → get meta ────────────────
+    meta = update_csv_with_user(result, str(semester), job_role)
 
-    # ── Step 4: Build recommendations from missing skills ──
+    # ── Build recommendations ────────────────
     recommendations = build_recommendations(
         missing_skills = result.get("missing_skills", []),
-        year           = year,
+        semester       = int(semester),
     )
 
-    # ── Step 5: Get role required skills for context ───────
-    required_skills = ur.get_skills_list(r.job_skill_profiles[job_role])
+    # ── Required skills for context ──────────
+    required_skills = get_skills_list(job_skill_profiles[job_role])
 
-    # ── Step 6: Return enriched response ───────────────────
+    # ── Build response ───────────────────────
     return {
         "filename":         filename,
         "candidate_name":   user_name,
-        "job_role":         job_role,
+        "enrollment":       enrollment,
+        "semester":         str(semester),
         "branch":           branch,
-        "year":             year,
+        "job_role":         job_role,
 
         # Scores
         "final_score":            result["final_score"],
@@ -124,36 +181,37 @@ def analyze_resume(
         "ranking_tier":           result["ranking_tier"],
 
         # Skills
-        "found_skills":           result.get("found_skills",         []),
-        "missing_skills":         result.get("missing_skills",       []),
-        "top2_found_skills":      result.get("top2_found_skills",    []),
-        "top2_missing_skills":    result.get("top2_missing_skills",  []),
-        "required_skills":        required_skills,
+        "found_skills":        result.get("found_skills",        []),
+        "missing_skills":      result.get("missing_skills",      []),
+        "top2_found_skills":   result.get("top2_found_skills",   []),
+        "top2_missing_skills": result.get("top2_missing_skills", []),
+        "required_skills":     required_skills,
 
-        # Rank
-        "rank":             user_rank,
-        "total_candidates": total,
-        "percentile":       percentile,
+        # Rank meta
+        "is_first":        meta["is_first"],
+        "was_update":      meta["was_update"],
+        "previous_rank":   meta["previous_rank"],
+        "previous_score":  meta["previous_score"],
+        "current_rank":    meta["current_rank"],
+        "total":           meta["total"],
+        "percentile":      round((1 - (meta["current_rank"] - 1) / meta["total"]) * 100, 1) if meta["total"] > 0 else 0,
+        "csv_path":        meta["csv_path"],
 
         # Recommendations
-        "recommendations":  recommendations,
+        "recommendations": recommendations,
 
         # Text preview
         "resume_word_count": len(resume_text.split()),
-        "text_preview":      resume_text[:500],
     }
 
 
 # ─────────────────────────────────────────────
-# Recommendations: prioritize missing skills
+# Recommendations
 # ─────────────────────────────────────────────
-def build_recommendations(missing_skills: list[str], year: int = 0) -> list[dict[str, Any]]:
-    """
-    Convert missing skills into prioritized recommendations.
-    Top missing skills get 'high' priority (they're weighted highest in your engineer_data).
-    """
+def build_recommendations(missing_skills: list, semester: int = 3) -> list:
+    """Convert missing skills into prioritized recommendations."""
     recommendations = []
-    for i, skill in enumerate(missing_skills[:8]):   # top 8
+    for i, skill in enumerate(missing_skills[:8]):
         if i < 2:
             priority = "high"
             reason   = "Critical skill for this role — highly weighted by employers."
@@ -164,10 +222,9 @@ def build_recommendations(missing_skills: list[str], year: int = 0) -> list[dict
             priority = "low"
             reason   = "Good to have — adds depth to your resume."
 
-        # Year-specific advice
-        if year and year <= 2 and priority == "high":
+        if semester and semester <= 2 and priority == "high":
             reason += " Start learning now while you have time."
-        elif year and year >= 3 and priority == "high":
+        elif semester and semester >= 3 and priority == "high":
             reason += " Prioritize this before placements."
 
         recommendations.append({
@@ -177,39 +234,3 @@ def build_recommendations(missing_skills: list[str], year: int = 0) -> list[dict
         })
 
     return recommendations
-
-
-# ─────────────────────────────────────────────
-# Quick stats from CSV
-# ─────────────────────────────────────────────
-def get_csv_stats() -> dict[str, Any]:
-    """Get stats about existing rankings."""
-    if not os.path.exists(r.CSV_PATH):
-        return {"total": 0, "exists": False}
-
-    import csv
-    rows = []
-    with open(r.CSV_PATH, "r", encoding="utf-8") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            try:
-                row["score_float"] = float(row["final_score"].replace("%", "").strip())
-            except (ValueError, KeyError):
-                row["score_float"] = 0.0
-            rows.append(row)
-
-    if not rows:
-        return {"total": 0, "exists": True}
-
-    scores  = [r["score_float"] for r in rows]
-    return {
-        "total":       len(rows),
-        "exists":      True,
-        "avg_score":   round(sum(scores) / len(scores), 2),
-        "top_score":   round(max(scores), 2),
-        "min_score":   round(min(scores), 2),
-        "top_5":       [
-            {"name": r["candidate_name"], "score": r["final_score"], "tier": r["ranking_tier"]}
-            for r in sorted(rows, key=lambda x: x["score_float"], reverse=True)[:5]
-        ],
-    }
