@@ -40,6 +40,7 @@ app.add_middleware(
 print(f"Project root: {PROJECT_ROOT}")
 print("Loading chatbot...")
 bot = RAGChatbot()
+bot.chat("Hello")  # Load embeddings and initialize model
 print("✅ Chatbot ready")
 
 
