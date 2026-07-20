@@ -1,8 +1,3 @@
-# src/IR/summariser_indexed.py
-#
-# Chunk-based summarizer that uses pre-indexed data from chunks.json
-# instead of re-downloading files from Google Drive.
-
 import os
 import re
 import json
@@ -11,18 +6,11 @@ from collections import defaultdict
 
 from llm import get_answer
 
-
-# ─────────────────────────────────────────────
-# Paths
-# ─────────────────────────────────────────────
 CURRENT_DIR  = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, "..", ".."))
 INDEX_PATH   = os.path.join(PROJECT_ROOT, "index_store", "chunks.json")
 
 
-# ─────────────────────────────────────────────
-# Caches
-# ─────────────────────────────────────────────
 _chunks_cache = None
 _url_map      = None
 
@@ -74,9 +62,6 @@ def load_url_map() -> dict:
     return _url_map
 
 
-# ─────────────────────────────────────────────
-# Browse hierarchy (from chunk metadata)
-# ─────────────────────────────────────────────
 def get_semester_folders() -> dict:
     """
     Get available semesters like SEM_FOLDERS from summariser.py.
@@ -93,7 +78,6 @@ def get_semester_folders() -> dict:
     return {sem: sorted(list(branches)) for sem, branches in sorted(result.items())}
 
 
-# For compatibility with existing chatbot.py that imports SEM_FOLDERS
 SEM_FOLDERS = get_semester_folders()
 
 
@@ -132,7 +116,7 @@ def load_gdrive_links(semester: str) -> list:
             "subject":      subject,
             "category":     category,
             "branch":       branch,
-            "file_id":      "",    # not needed — we use indexed chunks
+            "file_id":      "",
             "original_url": url_map.get(key, ""),
             "is_folder":    False,
         })
@@ -302,7 +286,7 @@ REMOVE duplicates. Merge similar points. Be thorough but coherent.
 # ─────────────────────────────────────────────
 # Token / word budget
 # ─────────────────────────────────────────────
-CHUNK_BUDGET   = 3500   # max words per LLM call for chunk extraction
+CHUNK_BUDGET   = 4000   # max words per LLM call for chunk extraction
 SINGLE_BUDGET  = 4000   # if lecture <= this, do single call
 SERIES_BUDGET  = 5000   # if series <= this, combine into single call
 

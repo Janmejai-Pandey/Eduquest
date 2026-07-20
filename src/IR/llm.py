@@ -50,7 +50,7 @@ def _call_groq(messages: list) -> str:
         messages    = messages,
         temperature = config.GROQ_TEMPERATURE,
         max_tokens  = config.GROQ_MAX_TOKENS,
-        reasoning_effort="none",
+        reasoning_effort="low",
     )
     return response.choices[0].message.content.strip()
 
