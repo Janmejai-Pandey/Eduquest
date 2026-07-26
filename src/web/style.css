@@ -15,7 +15,7 @@
     background: rgba(245, 240, 235, 0.85);
     backdrop-filter: blur(1.25rem);
     -webkit-backdrop-filter: blur(1.25rem);
-    border-bottom: 0.0625rem solid rgba(0, 0, 0, 0.06);
+    border-bottom: 0.08rem solid rgba(0, 0, 0, 0.1);
     transition: var(--transition);
 }
 
@@ -485,7 +485,7 @@
 
 .features-grid {
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(4, 1fr);
     gap: 1.5rem;
 }
 
@@ -739,4 +739,20 @@
     padding-top: 1.5rem;
     text-align: center;
     font-size: 0.8125rem;
+}
+
+a.feature-card {
+    text-decoration: none;
+    color: inherit;
+    display: block;
+    cursor: pointer;
+}
+
+a.feature-card:hover h3 {
+    color: var(--purple);
+}
+
+.feature-icon.green {
+    background: #dcfce7;
+    color: #15803d;
 }

@@ -286,9 +286,9 @@ REMOVE duplicates. Merge similar points. Be thorough but coherent.
 # ─────────────────────────────────────────────
 # Token / word budget
 # ─────────────────────────────────────────────
-CHUNK_BUDGET   = 4000   # max words per LLM call for chunk extraction
-SINGLE_BUDGET  = 4000   # if lecture <= this, do single call
-SERIES_BUDGET  = 5000   # if series <= this, combine into single call
+CHUNK_BUDGET   = 3500   # max words per LLM call for chunk extraction
+SINGLE_BUDGET  = 3500   # if lecture <= this, do single call
+SERIES_BUDGET  = 3500   # if series <= this, combine into single call
 
 
 # ─────────────────────────────────────────────

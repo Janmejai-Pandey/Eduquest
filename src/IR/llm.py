@@ -69,6 +69,9 @@ def _call_openrouter(messages: list) -> str:
             "HTTP-Referer": config.OPENROUTER_APP_URL,
             "X-Title":      config.OPENROUTER_APP_NAME,
         },
+            response_format={
+            "type": "json_object"
+        },
     )
     return response.choices[0].message.content.strip()
 

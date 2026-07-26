@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Nakari - AI Study Companion</title>
+    <title>EduQuest — Your AI Study Companion</title>
 
-    <!-- Google Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
 
-    <!-- Stylesheets -->
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="utils.css">
+
+    <script src="script.js" defer></script>
 </head>
 <body>
 
@@ -19,7 +19,7 @@
         <div class="nav-inner">
             <a href="#" class="nav-logo">
                 <div class="nav-logo-icon">📚</div>
-                <span class="nav-logo-text">Nakari</span>
+                <span class="nav-logo-text">EduQuest</span>
             </a>
 
             <ul class="nav-links" id="navLinks">
@@ -27,22 +27,19 @@
                 <li class="dropdown">
                     <a href="#features" class="dropdown-toggle">Tools</a>
                     <div class="dropdown-menu">
-                        <a href="chat/chat.html">Document Chat</a>
-                        <a href="#features">Auto Flashcards</a>
-                        <a href="#features">Study Planner</a>
-                        <a href="quiz/quiz.html">Quiz Generator</a>
+                        <a href="./chat/chat.html">💬 Document Chat</a>
+                        <a href="./quiz/quiz.html">🎯 Quiz Generator</a>
+                        <a href="./pyq/pyq.html">🔥 PYQ Analyser</a>
+                        <a href="./resume/resume.html">📄 Resume Rank</a>
                     </div>
                 </li>
                 <li><a href="#how-it-works">How it Works</a></li>
-                <li><a href="resume/resume.html">Resume Rank</a></li> 
                 <li><a href="#stats">About</a></li>
-                <li><a href="chat/chat.html" class="nav-cta">Start Studying</a></li>
+                <li><a href="./chat/chat.html" class="nav-cta">Start Studying</a></li>
             </ul>
 
-            <button class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
-                <span></span>
-                <span></span>
-                <span></span>
+            <button type="button" class="mobile-toggle" id="mobileToggle" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
             </button>
         </div>
     </nav>
@@ -63,13 +60,14 @@
                     </h1>
 
                     <p class="hero-description">
-                        Upload your lecture slides, textbooks, and notes. Ask questions, 
-                        generate flashcards, and get instant explanations — all from your 
-                        own documents.
+                        Upload your lecture slides, textbooks, and notes.
+                        Chat with your documents, generate quizzes, analyze
+                        previous year papers, and rank your resume — all in
+                        one place.
                     </p>
 
                     <div class="hero-buttons">
-                        <a href="chat/chat.html" class="btn-primary">
+                        <a href="./chat/chat.html" class="btn-primary">
                             Upload & Chat <span class="arrow">→</span>
                         </a>
                         <a href="#features" class="btn-secondary">
@@ -88,7 +86,7 @@
                         </div>
                         <div class="hero-check">
                             <div class="check-icon">✓</div>
-                            Instant answers
+                            DOCX support
                         </div>
                     </div>
                 </div>
@@ -119,7 +117,7 @@
 
                         <div class="chat-input-area">
                             <input type="text" placeholder="Ask a follow-up question..." disabled>
-                            <button class="chat-send-btn">➤</button>
+                            <button type="button" class="chat-send-btn">➤</button>
                         </div>
 
                         <div class="chat-source-badge">
@@ -139,23 +137,31 @@
             <h2 class="section-title fade-in">Everything you need to excel</h2>
 
             <div class="features-grid">
-                <div class="feature-card fade-in">
+
+                <a href="./chat/chat.html" class="feature-card fade-in">
                     <div class="feature-icon purple">💬</div>
                     <h3>Document Chat</h3>
-                    <p>Upload PDFs and PPTX files. Ask questions and get precise answers drawn directly from your material.</p>
-                </div>
+                    <p>Ask questions about your indexed PDFs, PPTX, and DOCX files. Get precise answers with source citations from your material.</p>
+                </a>
 
-                <div class="feature-card fade-in">
-                    <div class="feature-icon violet">🧠</div>
-                    <h3>Auto Flashcards</h3>
-                    <p>Generate intelligent flashcards from your notes and study them with spaced repetition.</p>
-                </div>
+                <a href="./quiz/quiz.html" class="feature-card fade-in">
+                    <div class="feature-icon violet">🎯</div>
+                    <h3>Quiz Generator</h3>
+                    <p>Auto-generate MCQs, True/False, Fill-in-the-blanks, and short answer questions from your notes. Attempt them interactively.</p>
+                </a>
 
-                <div class="feature-card fade-in">
-                    <div class="feature-icon orange">⏱️</div>
-                    <h3>Study Planner</h3>
-                    <p>Organize your study sessions, track progress, and meet your deadlines with confidence.</p>
-                </div>
+                <a href="./pyq/pyq.html" class="feature-card fade-in">
+                    <div class="feature-icon orange">🔥</div>
+                    <h3>PYQ Analyser</h3>
+                    <p>Analyze previous year papers to reveal hot topics, recurring patterns, and predicted questions for T1, T2, and T3 exams.</p>
+                </a>
+
+                <a href="./resume/resume.html" class="feature-card fade-in">
+                    <div class="feature-icon green">📄</div>
+                    <h3>Resume Rank</h3>
+                    <p>Upload your resume, pick a target role, and see how you rank against peers in your year. Get personalized skill recommendations.</p>
+                </a>
+
             </div>
         </div>
     </section>
@@ -166,31 +172,31 @@
             <div class="how-inner">
                 <div>
                     <div class="how-label">HOW IT WORKS</div>
-                    <h2 class="how-title">From upload to understanding in minutes.</h2>
+                    <h2 class="how-title">From documents to insights in minutes.</h2>
                 </div>
 
                 <div class="steps">
                     <div class="step">
                         <div class="step-number">01</div>
                         <div>
-                            <h3>Upload your documents</h3>
-                            <p>Drag and drop your lecture PDFs or PPTX slides.</p>
+                            <h3>Index your documents</h3>
+                            <p>Your PDFs, PPTX, and DOCX files are indexed with metadata (branch, year, subject, category) for fast retrieval.</p>
                         </div>
                     </div>
 
                     <div class="step">
                         <div class="step-number">02</div>
                         <div>
-                            <h3>Ask anything</h3>
-                            <p>Type your question in plain English. NaKari reads your files and responds with specific references.</p>
+                            <h3>Ask, generate, or analyze</h3>
+                            <p>Chat with your notes, generate practice quizzes, analyze past papers, or rank your resume — all from indexed data.</p>
                         </div>
                     </div>
 
                     <div class="step">
                         <div class="step-number">03</div>
                         <div>
-                            <h3>Learn deeper</h3>
-                            <p>Generate flashcards, create summaries, and build study plans from your material.</p>
+                            <h3>Learn & improve</h3>
+                            <p>Get answers with source citations, discover exam patterns, and identify skill gaps to build a stronger profile.</p>
                         </div>
                     </div>
                 </div>
@@ -203,23 +209,23 @@
         <div class="container">
             <div class="stats-grid">
                 <div class="stat-item fade-in">
-                    <div class="stat-number" data-target="10">0</div>
-                    <div class="stat-suffix">K+</div>
-                    <div class="stat-label">Students using NaKari</div>
+                    <div class="stat-number">4</div>
+                    <div class="stat-suffix"></div>
+                    <div class="stat-label">Powerful tools</div>
                 </div>
                 <div class="stat-item fade-in">
-                    <div class="stat-number" data-target="250">0</div>
-                    <div class="stat-suffix">K+</div>
-                    <div class="stat-label">Documents processed</div>
+                    <div class="stat-number">3</div>
+                    <div class="stat-suffix"></div>
+                    <div class="stat-label">File formats supported</div>
                 </div>
                 <div class="stat-item fade-in">
-                    <div class="stat-number" data-target="98">0</div>
-                    <div class="stat-suffix">%</div>
-                    <div class="stat-label">Accuracy from source material</div>
+                    <div class="stat-number">1</div>
+                    <div class="stat-suffix"></div>
+                    <div class="stat-label">Unified index</div>
                 </div>
                 <div class="stat-item fade-in">
-                    <div class="stat-number">4.9<span class="star">★</span></div>
-                    <div class="stat-label">Average user rating</div>
+                    <div class="stat-number">∞</div>
+                    <div class="stat-label">Study possibilities</div>
                 </div>
             </div>
         </div>
@@ -231,11 +237,11 @@
             <div class="section-label fade-in">GET STARTED</div>
             <h2 class="section-title fade-in">Ready to study smarter?</h2>
             <p class="fade-in">
-                Upload your first document and experience the future of studying. 
-                It's free to get started.
+                Jump into any of the tools and start using your indexed
+                study materials to prepare for exams effectively.
             </p>
             <div class="fade-in">
-                <a href="chat/chat.html" class="btn-primary" style="font-size: 18px; padding: 18px 40px;">
+                <a href="./chat/chat.html" class="btn-primary" style="font-size: 1.125rem; padding: 1.125rem 2.5rem;">
                     Start Studying Now <span class="arrow">→</span>
                 </a>
             </div>
@@ -249,17 +255,18 @@
                 <div class="footer-brand">
                     <a href="#" class="nav-logo" style="color: white;">
                         <div class="nav-logo-icon">📚</div>
-                        <span class="nav-logo-text">NaKari</span>
+                        <span class="nav-logo-text">EduQuest</span>
                     </a>
-                    <p>Your AI-powered study companion. Upload documents, ask questions, and learn smarter.</p>
+                    <p>Your AI-powered study companion. Index your documents once, then chat, quiz, analyze, and rank — all from one place.</p>
                 </div>
 
                 <div>
-                    <h4>Product</h4>
+                    <h4>Tools</h4>
                     <ul>
-                        <li><a href="#features">Document Chat</a></li>
-                        <li><a href="#features">Flashcards</a></li>
-                        <li><a href="#features">Study Planner</a></li>
+                        <li><a href="./chat/chat.html">Document Chat</a></li>
+                        <li><a href="./quiz/quiz.html">Quiz Generator</a></li>
+                        <li><a href="./pyq/pyq.html">PYQ Analyser</a></li>
+                        <li><a href="./resume/resume.html">Resume Rank</a></li>
                     </ul>
                 </div>
 
@@ -267,29 +274,26 @@
                     <h4>Resources</h4>
                     <ul>
                         <li><a href="#how-it-works">How it Works</a></li>
-                        <li><a href="#">FAQ</a></li>
-                        <li><a href="#">Blog</a></li>
+                        <li><a href="#features">Features</a></li>
+                        <li><a href="#stats">About</a></li>
                     </ul>
                 </div>
 
                 <div>
-                    <h4>Connect</h4>
+                    <h4>Support</h4>
                     <ul>
-                        <li><a href="#">GitHub</a></li>
-                        <li><a href="#">Twitter</a></li>
+                        <li><a href="#">Documentation</a></li>
+                        <li><a href="https://github.com/Janmejai-Pandey/Eduquest" target="_blank">GitHub</a></li>
                         <li><a href="#">Contact</a></li>
                     </ul>
                 </div>
             </div>
 
             <div class="footer-bottom">
-                © 2025 NaKari. Built with ❤️ for students everywhere.
+                © 2026 EduQuest. Built for students, by students.
             </div>
         </div>
     </footer>
-
-    <!-- Script -->
-    <script src="script.js"></script>
 
 </body>
 </html>

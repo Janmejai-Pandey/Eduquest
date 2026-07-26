@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   NaKari — Main Script
+   EduQuest — Main Script
    ════════════════════════════════════════════════════════════ */
 
 (function () {
@@ -169,6 +169,6 @@
     // ════════════════════════════════════════
     // 6. READY
     // ════════════════════════════════════════
-    console.log('🎓 NaKari website loaded successfully');
+    console.log('🎓 EduQuest website loaded successfully');
 
 })();
