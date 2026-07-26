@@ -4,3 +4,5 @@ dataset/**
 **/__pycache__/
 *.pyc
 config.py
+.env
+test.py

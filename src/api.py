@@ -19,7 +19,7 @@ from chatbot import RAGChatbot
 # Initialize FastAPI
 # ─────────────────────────────────────────────
 app = FastAPI(
-    title="NaKari API",
+    title="EduQuest API",
     description="RAG chatbot API over PDF + PPTX documents",
     version="1.0.0",
 )
@@ -194,7 +194,7 @@ def enrich_sources(sources):
 def root():
     return {
         "status":  "online",
-        "service": "NaKari API",
+        "service": "EduQuest API",
         "docs":    "/docs",
     }
 
@@ -552,4 +552,157 @@ def quiz_score_endpoint(req: QuizScoreRequest):
     try:
         return quiz_score_answers(req.questions, req.user_answers)
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    
+# ════════════════════════════════════════════════════════
+# PYQ ANALYSER ENDPOINTS (uses indexed chunks, any year)
+# ════════════════════════════════════════════════════════
+
+from pyq_analyser_indexed import (
+    get_all_years            as pyq_get_all_years,
+    get_subjects_with_pyqs   as pyq_get_subjects,
+    get_pyq_files            as pyq_get_files,
+    get_pyq_files_for_exam   as pyq_get_files_for_exam,
+    get_lecture_context      as pyq_get_lecture_context,
+    gather_pyq_content       as pyq_gather_content,
+    run_analysis             as pyq_run_analysis,
+    generate_practice_paper  as pyq_generate_paper,
+    parse_practice_paper     as pyq_parse_paper,
+    SUBJECT_ALIASES          as PYQ_SUBJECT_ALIASES,
+    SUBJECTS_WITH_LAB_THEORY as PYQ_LAB_THEORY,
+)
+
+
+class PyqAnalyzeRequest(BaseModel):
+    semester: str
+    subject:  str
+    exam:     str                       # T1 | T2 | T3
+    mode:     str = "full"              # full | frequency | practice
+
+
+@app.get("/pyq/years")
+def pyq_years():
+    """List all years/semesters that have any PYQ data."""
+    try:
+        years = pyq_get_all_years()
+        return {"years": years, "count": len(years)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pyq/subjects/{semester}")
+def pyq_subjects(semester: str):
+    """List subjects that have PYQs in a semester/year."""
+    try:
+        subjects = pyq_get_subjects(semester)
+
+        result = []
+        for s in subjects:
+            aliases = [k for k, v in PYQ_SUBJECT_ALIASES.items() if v == s]
+            result.append({
+                "name":    s,
+                "aliases": aliases[:5],
+                "has_lab_theory": any(
+                    s in (theory, lab)
+                    for (theory, lab) in PYQ_LAB_THEORY.values()
+                ),
+            })
+        return {"subjects": result, "count": len(result)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/pyq/papers/{semester}/{subject}")
+def pyq_papers(semester: str, subject: str, exam: str | None = None):
+    """List available PYQ papers for a subject (optionally filtered by exam)."""
+    try:
+        all_pyqs = pyq_get_files(semester, subject)
+
+        if exam:
+            filtered = pyq_get_files_for_exam(semester, subject, exam)
+        else:
+            filtered = all_pyqs
+
+        return {
+            "subject": subject,
+            "exam":    exam,
+            "total":   len(all_pyqs),
+            "matched": len(filtered),
+            "papers":  filtered,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/pyq/analyze")
+def pyq_analyze(req: PyqAnalyzeRequest):
+    """Run full PYQ analysis using indexed data."""
+    try:
+        if req.exam not in ("T1", "T2", "T3"):
+            raise HTTPException(status_code=400, detail="Exam must be T1, T2, or T3")
+
+        # Get files for this exam
+        matched = pyq_get_files_for_exam(req.semester, req.subject, req.exam)
+
+        if not matched:
+            all_files = pyq_get_files(req.semester, req.subject)
+            return {
+                "success":  False,
+                "error":    f"No {req.exam} papers found for {req.subject}",
+                "available_papers": [f["name"] for f in all_files],
+            }
+
+        # Gather + verify (from indexed chunks — NO GDRIVE)
+        file_names = [f["name"] for f in matched]
+        content, included, rejected = pyq_gather_content(
+            req.semester, req.subject, file_names
+        )
+
+        if not content.strip():
+            return {
+                "success":   False,
+                "error":     "No papers passed subject verification",
+                "rejected":  rejected,
+            }
+
+        # Analyze
+        analysis = pyq_run_analysis(content, req.subject, req.exam, len(included))
+
+        if analysis.get("_parse_error"):
+            return {
+                "success": False,
+                "error":   "Could not parse LLM output",
+                "raw":     analysis.get("raw", "")[:500],
+            }
+
+        # Generate practice paper if needed
+        practice_paper = None
+        practice_questions = None
+        if req.mode in ("full", "practice"):
+            lecture_ctx = pyq_get_lecture_context(req.semester, req.subject)
+            practice_paper = pyq_generate_paper(
+                analysis, req.subject, req.exam, lecture_ctx, len(included)
+            )
+            if req.mode == "practice":
+                practice_questions = pyq_parse_paper(practice_paper)
+
+        return {
+            "success":            True,
+            "subject":            req.subject,
+            "exam":               req.exam,
+            "semester":           req.semester,
+            "included_papers":    included,
+            "rejected_papers":    rejected,
+            "num_included":       len(included),
+            "num_rejected":       len(rejected),
+            "analysis":           analysis,
+            "practice_paper":     practice_paper,
+            "practice_questions": practice_questions,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))

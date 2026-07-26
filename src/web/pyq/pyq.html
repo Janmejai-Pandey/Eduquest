@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PYQ Analyser — EduQuest</title>
+
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:ital,wght@0,700;1,700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="../utils.css">
+    <link rel="stylesheet" href="pyq.css">
+
+    <script src="../script.js" defer></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+    <script src="pyq.js" defer></script>
+</head>
+<body>
+
+    <!-- NAVBAR -->
+    <nav class="navbar" id="navbar">
+        <div class="nav-inner">
+            <a href="index.html" class="nav-logo">
+                <div class="nav-logo-icon">📚</div>
+                <span class="nav-logo-text">EduQuest</span>
+            </a>
+            <ul class="nav-links" id="navLinks">
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../chat/chat.html">Chat</a></li>
+                <li><a href="../quiz/quiz.html">Quiz</a></li>
+                <li><a href="pyq.html" class="active">PYQ Analyser</a></li>
+                <li><a href="../resume/resume.html">Resume Rank</a></li>
+            </ul>
+            <button type="button" class="mobile-toggle" id="mobileToggle">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- HERO -->
+    <section class="pyq-hero">
+        <div class="container">
+            <div class="pyq-badge">🔥 PYQ Intelligence Analyser</div>
+            <h1>Crack your <em>exam.</em></h1>
+            <p>Analyze previous year papers to reveal hot topics, recurring patterns, and predicted questions. Get a personalized study plan tailored to your exam.</p>
+        </div>
+    </section>
+
+    <!-- SETUP -->
+    <section class="pyq-section" id="setupSection">
+        <div class="container">
+            <div class="pyq-card">
+                <h2>Configure Analysis</h2>
+
+                <form id="pyqForm" onsubmit="return false;">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="semSelect">🎓 Year</label>
+                            <select id="semSelect" required>
+                                <option value="">Loading years...</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="subjectSelect">📚 Subject</label>
+                            <select id="subjectSelect" required disabled>
+                                <option value="">Select year first</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>📝 Exam Type</label>
+                        <div class="exam-tabs">
+                            <button type="button" class="exam-tab" data-exam="T1">
+                                <span class="exam-code">T1</span>
+                                <span class="exam-label">Test 1</span>
+                                <small>~30% syllabus</small>
+                            </button>
+                            <button type="button" class="exam-tab" data-exam="T2">
+                                <span class="exam-code">T2</span>
+                                <span class="exam-label">Test 2</span>
+                                <small>Weeks 6-10</small>
+                            </button>
+                            <button type="button" class="exam-tab" data-exam="T3">
+                                <span class="exam-code">T3</span>
+                                <span class="exam-label">End Sem</span>
+                                <small>Full syllabus</small>
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>🎯 Analysis Mode</label>
+                        <div class="mode-cards">
+                            <label class="mode-card active">
+                                <input type="radio" name="mode" value="full" checked hidden>
+                                <div class="mode-icon">📊</div>
+                                <div class="mode-title">Full Report</div>
+                                <div class="mode-desc">Topics + patterns + predicted paper + study plan</div>
+                            </label>
+                            <label class="mode-card">
+                                <input type="radio" name="mode" value="frequency" hidden>
+                                <div class="mode-icon">🔥</div>
+                                <div class="mode-title">Topic Frequency</div>
+                                <div class="mode-desc">Quick view of what's asked most</div>
+                            </label>
+                            <label class="mode-card">
+                                <input type="radio" name="mode" value="practice" hidden>
+                                <div class="mode-icon">📝</div>
+                                <div class="mode-title">Practice Paper</div>
+                                <div class="mode-desc">Predicted paper + attempt interactively</div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Preview of available papers -->
+                    <div class="paper-preview" id="paperPreview" style="display:none;">
+                        <h4>📄 Available Papers</h4>
+                        <div class="paper-preview-list" id="paperPreviewList"></div>
+                    </div>
+
+                    <button type="button" class="analyze-btn" id="analyzeBtn" disabled>
+                        🔍 Analyze PYQs
+                    </button>
+                </form>
+            </div>
+        </div>
+    </section>
+
+    <!-- LOADING -->
+    <section class="pyq-section" id="loadingSection" style="display:none;">
+        <div class="container">
+            <div class="loading-card">
+                <div class="big-spinner"></div>
+                <h3 id="loadingText">Analyzing papers…</h3>
+                <p>Loading indexed content and running AI analysis</p>
+                <div class="progress-stages">
+                    <div class="stage" id="stage1">📄 Loading chunks</div>
+                    <div class="stage" id="stage2">✅ Verifying</div>
+                    <div class="stage" id="stage3">🧠 Analyzing</div>
+                    <div class="stage" id="stage4">📊 Complete</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- RESULTS -->
+    <section class="pyq-section" id="resultsSection" style="display:none;">
+        <div class="container">
+
+            <!-- Header -->
+            <div class="result-header">
+                <div>
+                    <h2 id="resultTitle">Analysis Report</h2>
+                    <p id="resultSubtitle">—</p>
+                </div>
+                <div class="result-actions">
+                    <button type="button" class="action-btn" id="newAnalysisBtn">🔄 New</button>
+                    <button type="button" class="action-btn" id="downloadBtn">💾 Download</button>
+                    <button type="button" class="action-btn" id="printBtn">🖨️ Print</button>
+                </div>
+            </div>
+
+            <!-- Papers status -->
+            <div class="pyq-card">
+                <div class="papers-status">
+                    <div class="papers-count included">
+                        <div class="papers-num" id="includedCount">0</div>
+                        <div class="papers-label">✓ Included</div>
+                    </div>
+                    <div class="papers-count rejected" id="rejectedContainer" style="display:none;">
+                        <div class="papers-num" id="rejectedCount">0</div>
+                        <div class="papers-label">✗ Rejected</div>
+                    </div>
+                </div>
+                <details class="papers-details">
+                    <summary>View paper list</summary>
+                    <div class="papers-lists">
+                        <div class="papers-list-block">
+                            <h5>✓ Included in analysis</h5>
+                            <ul id="includedList"></ul>
+                        </div>
+                        <div class="papers-list-block" id="rejectedBlock" style="display:none;">
+                            <h5>✗ Rejected (subject mismatch)</h5>
+                            <ul id="rejectedList"></ul>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <!-- Coverage summary -->
+            <div class="pyq-card" id="coverageCard">
+                <h3>📖 Coverage Summary</h3>
+                <p id="coverageSummary">—</p>
+                <div class="coverage-meta">
+                    <div class="meta-item">
+                        <span class="meta-label">Years covered</span>
+                        <span class="meta-value" id="yearsCovered">—</span>
+                    </div>
+                    <div class="meta-item">
+                        <span class="meta-label">Difficulty trend</span>
+                        <span class="meta-value" id="difficultyTrend">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Topic frequency chart -->
+            <div class="pyq-card" id="topicsCard">
+                <h3>🔥 Topic Frequency</h3>
+                <p class="card-subtitle">Sorted by how often they appear in PYQs</p>
+                <div class="topic-list" id="topicList"></div>
+            </div>
+
+            <!-- Question type distribution -->
+            <div class="two-col-grid">
+                <div class="pyq-card" id="qtypeCard">
+                    <h3>📝 Question Types</h3>
+                    <div class="qtype-bars" id="qtypeBars"></div>
+                </div>
+
+                <div class="pyq-card" id="marksCard">
+                    <h3>💯 Marks Pattern</h3>
+                    <div class="marks-info" id="marksInfo"></div>
+                </div>
+            </div>
+
+            <!-- Recurring questions -->
+            <div class="pyq-card" id="recurringCard">
+                <h3>🔁 Recurring Question Patterns</h3>
+                <p class="card-subtitle">Questions/patterns that appear repeatedly</p>
+                <div class="recurring-list" id="recurringList"></div>
+            </div>
+
+            <!-- Must-study topics -->
+            <div class="pyq-card must-study-card" id="mustStudyCard">
+                <h3>🎯 Must-Study Topics</h3>
+                <p class="card-subtitle">Focus on these first — highest priority</p>
+                <ol class="must-study-list" id="mustStudyList"></ol>
+            </div>
+
+            <!-- Predicted paper (full mode) -->
+            <div class="pyq-card" id="predictedCard" style="display:none;">
+                <h3>⭐ Predicted Practice Paper</h3>
+                <p class="card-subtitle">AI-generated based on PYQ patterns</p>
+                <div class="predicted-paper markdown-body" id="predictedPaper"></div>
+            </div>
+
+            <!-- Interactive practice (practice mode) -->
+            <div class="pyq-card" id="practiceCard" style="display:none;">
+                <h3>📝 Interactive Practice</h3>
+
+                <div class="practice-header">
+                    <span id="practiceTitle">Question 1</span>
+                    <span class="practice-progress">
+                        <span id="currentQ">1</span> / <span id="totalQ">10</span>
+                    </span>
+                </div>
+
+                <div class="practice-progress-bar">
+                    <div class="practice-progress-fill" id="practiceFill"></div>
+                </div>
+
+                <div class="practice-question" id="practiceQuestion"></div>
+
+                <div class="practice-answer-area">
+                    <label for="practiceInput">✏️ Your Answer:</label>
+                    <textarea id="practiceInput" rows="4" placeholder="Type your answer here..."></textarea>
+                </div>
+
+                <div class="practice-reveal" id="practiceReveal" style="display:none;">
+                    <h4>✓ Answer</h4>
+                    <div id="revealAnswer"></div>
+                    <div id="revealExplanation" class="reveal-explanation"></div>
+                </div>
+
+                <div class="practice-nav">
+                    <button type="button" class="nav-btn" id="prevQBtn" disabled>← Previous</button>
+                    <button type="button" class="nav-btn" id="revealBtn">👁️ Show Answer</button>
+                    <button type="button" class="nav-btn primary" id="nextQBtn">Next →</button>
+                    <button type="button" class="nav-btn primary" id="finishPracticeBtn" style="display:none;">✓ Finish</button>
+                </div>
+            </div>
+
+            <!-- Practice results -->
+            <div class="pyq-card" id="practiceResultsCard" style="display:none;">
+                <div class="practice-result-header">
+                    <h3>🎉 Practice Complete!</h3>
+                    <div class="practice-stats">
+                        <div class="stat-box">
+                            <div class="stat-val" id="statAttempted">0</div>
+                            <div class="stat-lbl">Attempted</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-val" id="statTotal">0</div>
+                            <div class="stat-lbl">Total</div>
+                        </div>
+                        <div class="stat-box">
+                            <div class="stat-val" id="statPct">0%</div>
+                            <div class="stat-lbl">Completion</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+</body>
+</html>
