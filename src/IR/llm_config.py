@@ -32,7 +32,7 @@ OPENROUTER_API_KEY     = _get("OPENROUTER_API_KEY",     "")
 OPENROUTER_MODEL       = _get("OPENROUTER_MODEL",       "qwen/qwen3-14b:free")
 OPENROUTER_TEMPERATURE = _get("OPENROUTER_TEMPERATURE", 0.3, float)
 OPENROUTER_MAX_TOKENS  = _get("OPENROUTER_MAX_TOKENS",  2048, int)
-OPENROUTER_APP_URL     = _get("OPENROUTER_APP_URL",     "http://localhost:8000")
+OPENROUTER_APP_URL     = _get("OPENROUTER_APP_URL",     "https://lwckfp59-8000.inc1.devtunnels.ms")
 OPENROUTER_APP_NAME    = _get("OPENROUTER_APP_NAME",    "EduQuest")
 
 # Retry

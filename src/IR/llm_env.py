@@ -35,7 +35,7 @@ OPENROUTER_API_KEY     = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_MODEL       = os.getenv("OPENROUTER_MODEL", "meta-llama/llama-3.3-70b-instruct:free")
 OPENROUTER_TEMPERATURE = float(os.getenv("OPENROUTER_TEMPERATURE", "0.3"))
 OPENROUTER_MAX_TOKENS  = int(os.getenv("OPENROUTER_MAX_TOKENS", "2048"))
-OPENROUTER_APP_URL     = os.getenv("OPENROUTER_APP_URL", "http://localhost:8000")
+OPENROUTER_APP_URL     = os.getenv("OPENROUTER_APP_URL", "https://lwckfp59-8000.inc1.devtunnels.ms")
 OPENROUTER_APP_NAME    = os.getenv("OPENROUTER_APP_NAME", "EduQuest")
 
 # Fallback OpenRouter models (tried in order if primary fails with 404)

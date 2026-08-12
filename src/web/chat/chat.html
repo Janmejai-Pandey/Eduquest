@@ -136,6 +136,16 @@
         </main>
     </div>
 
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath:  [['\\(', '\\)'], ['$', '$']],
+                displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            },
+            svg: { fontCache: 'global' },
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="../script.js"></script>
     <script src="chat.js"></script>

@@ -5,7 +5,7 @@
 (function () {
     'use strict';
 
-    const API_URL = 'http://localhost:8000';
+    const API_URL = 'https://eduquest-3p59.onrender.com';
 
     // DOM
     const userName        = document.getElementById('userName');

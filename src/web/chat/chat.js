@@ -2,7 +2,7 @@
   "use strict";
 
   // ── Config ──────────────────────────────
-  const API_URL = "http://localhost:8000";
+  const API_URL = "https://eduquest-3p59.onrender.com";
   const SESSION_ID = "web_" + Date.now();
 
   // ── DOM ─────────────────────────────────
@@ -496,6 +496,10 @@
     `;
     messagesBox.appendChild(el);
     scrollToBottom();
+
+    if (window.MathJax && window.MathJax.typesetPromise) {
+        MathJax.typesetPromise([el]).catch(err => console.warn(err));
+    }
   }
 
   function addErrorMessage(error) {

@@ -10,10 +10,20 @@
     <link rel="stylesheet" href="../style.css">
     <link rel="stylesheet" href="../utils.css">
     <link rel="stylesheet" href="pyq.css">
-
+    
     <script src="../script.js" defer></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
     <script src="pyq.js" defer></script>
+    <script>
+        window.MathJax = {
+            tex: {
+                inlineMath:  [['\\(', '\\)'], ['$', '$']],
+                displayMath: [['\\[', '\\]'], ['$$', '$$']],
+            },
+            svg: { fontCache: 'global' },
+        };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
 </head>
 <body>
 
@@ -304,6 +314,5 @@
 
         </div>
     </section>
-
 </body>
 </html>

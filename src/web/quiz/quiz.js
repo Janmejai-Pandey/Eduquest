@@ -5,7 +5,7 @@
 (function () {
     'use strict';
 
-    const API_URL = 'http://localhost:8000';
+    const API_URL = 'https://eduquest-3p59.onrender.com';
 
     // DOM
     const branchSelect   = document.getElementById('branchSelect');
@@ -578,6 +578,12 @@
             });
         }
 
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            MathJax.typesetPromise([questionContainer]).catch(err => {
+                console.warn('MathJax render error:', err);
+            });
+        }
+
         prevBtn.disabled = currentIdx === 0;
         const isLast = currentIdx === total - 1;
         nextBtn.style.display   = isLast ? 'none' : 'inline-block';
@@ -736,6 +742,12 @@
                 </div>
             `;
         }).join('');
+
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            MathJax.typesetPromise([reviewList]).catch(err => {
+                console.warn('MathJax render error:', err);
+            });
+        }
     }
 
     document.getElementById('retryBtn').addEventListener('click', () => {

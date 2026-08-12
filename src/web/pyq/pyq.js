@@ -1,5 +1,5 @@
 /* ════════════════════════════════════════════════════════════
-   PYQ ANALYSER — Dynamic year loading
+   PYQ ANALYSER — Dynamic year loading with MathJax support
    ════════════════════════════════════════════════════════════ */
 
 if (document.readyState === 'loading') {
@@ -13,7 +13,7 @@ function init() {
     console.log('🔥 PYQ Analyser initializing...');
 
     const $ = (id) => document.getElementById(id);
-    const API_URL = 'http://localhost:8000';
+    const API_URL = 'https://eduquest-3p59.onrender.com';
 
     // DOM
     const els = {
@@ -371,7 +371,7 @@ function init() {
             els.predictedCard.style.display = 'block';
             els.predictedPaper.innerHTML = window.marked
                 ? marked.parse(data.practice_paper)
-                : escapeHtml(data.practice_paper);
+                : escapeForMath(data.practice_paper);
         } else {
             els.predictedCard.style.display = 'none';
         }
@@ -389,6 +389,11 @@ function init() {
         }
 
         els.practiceResultsCard.style.display = 'none';
+
+        // Re-render math after everything is in the DOM
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            MathJax.typesetPromise().catch(err => console.warn(err));
+        }
     }
 
 
@@ -465,7 +470,7 @@ function init() {
                     <span class="recurring-freq">${r.frequency || 1}×</span>
                     <span class="recurring-topic">${escapeHtml(r.topic || '')}</span>
                 </div>
-                <div class="recurring-pattern">${escapeHtml(r.question_pattern || '')}</div>
+                <div class="recurring-pattern">${escapeForMath(r.question_pattern || '')}</div>
             </div>
         `).join('');
     }
@@ -495,13 +500,18 @@ function init() {
         els.currentQ.textContent = practiceIdx + 1;
         els.practiceFill.style.width = `${((practiceIdx + 1) / total) * 100}%`;
         els.practiceTitle.textContent = q.header || `Question ${practiceIdx + 1}`;
-        els.practiceQuestion.textContent = q.question_block || '';
+
+        // ✅ Use innerHTML + escapeForMath so LaTeX renders
+        els.practiceQuestion.innerHTML = escapeForMath(q.question_block || '');
+
         els.practiceInput.value = practiceAnswers[practiceIdx] || '';
 
         if (revealed[practiceIdx] && q.answer) {
             els.practiceReveal.style.display = 'block';
-            els.revealAnswer.textContent = q.answer;
-            els.revealExplanation.textContent = q.explanation ? `💡 ${q.explanation}` : '';
+            els.revealAnswer.innerHTML = escapeForMath(q.answer);
+            els.revealExplanation.innerHTML = q.explanation
+                ? `💡 ${escapeForMath(q.explanation)}`
+                : '';
         } else {
             els.practiceReveal.style.display = 'none';
         }
@@ -511,6 +521,12 @@ function init() {
         els.nextQBtn.style.display = isLast ? 'none' : 'inline-block';
         els.finishPracticeBtn.style.display = isLast ? 'inline-block' : 'none';
         els.revealBtn.textContent = revealed[practiceIdx] ? '🙈 Hide Answer' : '👁️ Show Answer';
+
+        // Re-render math in the new question
+        if (window.MathJax && window.MathJax.typesetPromise) {
+            MathJax.typesetPromise([els.practiceQuestion, els.practiceReveal])
+                .catch(err => console.warn(err));
+        }
     }
 
     els.practiceInput.addEventListener('input', e => {
@@ -587,6 +603,30 @@ function init() {
 
     function escapeAttr(str) {
         return escapeHtml(str).replace(/"/g, '&quot;');
+    }
+
+    /**
+     * Escapes HTML but PRESERVES LaTeX math delimiters so MathJax can parse.
+     * Also preserves newlines and simple markdown (bold/italic).
+     */
+    function escapeForMath(str) {
+        if (str === null || str === undefined) return '';
+
+        // Escape HTML special chars (but LaTeX \( \) \[ \] survive as-is)
+        let s = String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+
+        // Preserve newlines
+        s = s.replace(/\n/g, '<br>');
+
+        // Simple markdown
+        s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        s = s.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+
+        return s;
     }
 
 

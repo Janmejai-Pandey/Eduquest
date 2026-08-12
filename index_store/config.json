@@ -1,6 +1,6 @@
 {
   "embed_model": "BAAI/bge-m3",
   "embed_dim": 1024,
-  "num_chunks": 9294,
+  "num_chunks": 34191,
   "device": "cuda"
 }
