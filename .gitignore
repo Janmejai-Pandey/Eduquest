@@ -3,6 +3,5 @@ dataset/**
 !dataset/**/gdrive_links.json
 **/__pycache__/
 *.pyc
-config.py
 .env
 test.py
