@@ -2,7 +2,7 @@
   "use strict";
 
   // ── Config ──────────────────────────────
-  const API_URL = "https://eduquest-3p59.onrender.com";
+  const API_URL = "http://4.187.149.198";
   const SESSION_ID = "web_" + Date.now();
 
   // ── DOM ─────────────────────────────────

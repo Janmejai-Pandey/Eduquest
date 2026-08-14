@@ -13,7 +13,7 @@ function init() {
     console.log('🔥 PYQ Analyser initializing...');
 
     const $ = (id) => document.getElementById(id);
-    const API_URL = 'https://eduquest-3p59.onrender.com';
+    const API_URL = 'http://4.187.149.198';
 
     // DOM
     const els = {
