@@ -5,7 +5,7 @@
 (function () {
     'use strict';
 
-    const API_URL = 'http://4.187.149.198';
+    const API_URL = 'https://api.eduquest-jiit.me';
 
     // DOM
     const userName        = document.getElementById('userName');

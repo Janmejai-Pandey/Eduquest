@@ -2,7 +2,7 @@
   "use strict";
 
   // ── Config ──────────────────────────────
-  const API_URL = "http://4.187.149.198";
+  const API_URL = "https://api.eduquest-jiit.me";
   const SESSION_ID = "web_" + Date.now();
 
   // ── DOM ─────────────────────────────────
