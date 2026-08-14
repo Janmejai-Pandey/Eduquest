@@ -107,20 +107,20 @@ function init() {
             years.forEach(y => {
                 const opt = document.createElement('option');
                 opt.value = y;
-                opt.textContent = `Year ${y}`;
+                opt.textContent = `Sem ${y}`;
                 els.semSelect.appendChild(opt);
             });
 
-            console.log(`✅ Loaded ${years.length} year(s) with PYQs`);
+            console.log(`✅ Loaded ${years.length} semester(s) with PYQs`);
         } catch (err) {
-            console.error('Failed to load years:', err);
+            console.error('Failed to load semesters:', err);
             els.semSelect.innerHTML = '<option>⚠ Cannot connect</option>';
         }
     }
 
 
     // ════════════════════════════════════════
-    // LOAD SUBJECTS on year change
+    // LOAD SUBJECTS on semester change
     // ════════════════════════════════════════
     els.semSelect.addEventListener('change', async () => {
         const sem = els.semSelect.value;
