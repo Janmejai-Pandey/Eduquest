@@ -756,3 +756,13 @@ a.feature-card:hover h3 {
     background: #dcfce7;
     color: #15803d;
 }
+
+.footer-bottom a {
+    color: #6a8bed;
+    text-decoration: none;
+    font-weight: 900;
+}
+
+.footer-bottom a:hover {
+    text-decoration: underline;
+}
