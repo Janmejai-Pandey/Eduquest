@@ -27,7 +27,13 @@ app = FastAPI(
 # Allow frontend to call API
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "https://eduquest-jiit.vercel.app",
+        "https://eduquest-jiit.me",
+        "https://www.eduquest-jiit.me",
+        "http://localhost:5500",
+        "http://localhost:3000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -276,8 +282,81 @@ def get_stats():
     except Exception as e:
         import traceback
         traceback.print_exc()
-        raise HTTPException(status_code=500, detail=str(e))    
-       
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/stats")
+def get_stats():
+    """Build tree with file URLs from gdrive_links."""
+    try:
+        with open("index_store/chunks.json", encoding="utf-8") as f:
+            chunks = json.load(f)
+
+        tree = {}
+        seen_files = {}   # (branch, sem, subject, category, fname) → already added
+
+        for chunk in chunks:
+            branch   = chunk.get("branch",   "") or "Unknown"
+            sem      = chunk.get("semester", "") or "?"
+            subject  = chunk.get("subject",  "") or "Other"
+            category = normalize_category(chunk.get("category", ""))
+            fname    = chunk.get("source_file", "")
+
+            if not fname:
+                continue
+
+            group_key = (branch, sem, subject, category, fname)
+            if group_key in seen_files:
+                continue
+            seen_files[group_key] = True
+
+            # ✅ Look up URL from FILE_LINKS
+            url = ""
+            # Try composite key
+            url_key = f"{branch}|{sem}|{subject}|{fname}"
+            if url_key in FILE_LINKS:
+                info = FILE_LINKS[url_key]
+                url = info.get("url", "") if isinstance(info, dict) else ""
+
+            # Fallback: search by filename in NAME_INDEX
+            if not url and fname in NAME_INDEX:
+                for composite_key in NAME_INDEX[fname]:
+                    if composite_key in FILE_LINKS:
+                        info = FILE_LINKS[composite_key]
+                        url = info.get("url", "") if isinstance(info, dict) else ""
+                        if url:
+                            break
+
+            tree.setdefault(branch, {}) \
+                .setdefault(sem, {}) \
+                .setdefault(subject, {}) \
+                .setdefault(category, []) \
+                .append({
+                    "name": fname,
+                    "url":  url,
+                })
+
+        # Natural sort files in each category
+        for branch in tree:
+            for sem in tree[branch]:
+                for subject in tree[branch][sem]:
+                    for category in tree[branch][sem][subject]:
+                        tree[branch][sem][subject][category].sort(
+                            key=lambda f: natural_sort_key(f["name"])
+                        )
+
+        all_files = set(chunk.get("source_file", "") for chunk in chunks)
+
+        return {
+            "total_files":  len(all_files),
+            "total_chunks": len(chunks),
+            "tree":         tree,
+        }
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def normalize_category(cat: str) -> str:
     """Normalize various category names to consistent labels."""
     if not cat:
